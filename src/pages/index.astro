@@ -149,19 +149,10 @@ const categories = sampleWebsite ? await db
         </section>
       </div>
     }
-    
-    <!-- {sampleWebsite ? (
-      
-    ) : (
-      <div class="text-center py-12">
-        <p class="text-gray-600 mb-4">No sample website found. Please run the database seed first:</p>
-        <code class="bg-gray-100 px-4 py-2 rounded">npm run db:seed</code>
-      </div>
-    )} -->
   </main>
 </Layout>
 
-<script define:vars={{ websiteId: sampleWebsite?.id, apiKey: sampleWebsite?.apiKey, baseUrl: Astro.url.origin }}>
+<script is:inline define:vars={{ websiteId: sampleWebsite?.id, apiKey: sampleWebsite?.apiKey, baseUrl: Astro.url.origin }}>
   // Feedback submission
   const form = document.getElementById('feedback-form');
   const submitResult = document.getElementById('submit-result');
