@@ -1,0 +1,27 @@
+{
+  "name": "astro-feedback-api",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "build:remote": "astro check && astro build --remote",
+    "preview": "astro preview",
+    "astro": "astro",
+    "db:push": "astro db push",
+    "db:push:remote": "astro db push --remote",
+    "db:verify": "astro db verify",
+    "db:studio": "astro db studio"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@astrojs/db": "^0.17.1",
+    "@astrojs/node": "^9.3.0",
+    "astro": "^5.1.1",
+    "typescript": "^5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2"
+  }
+}

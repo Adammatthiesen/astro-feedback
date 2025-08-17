@@ -1,0 +1,317 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { db, Websites, FeedbackCategories } from 'astro:db';
+import { eq } from 'astro:db';
+
+// Get sample website for demo
+const sampleWebsite = await db.select().from(Websites).limit(1).get();
+const categories = sampleWebsite ? await db
+  .select()
+  .from(FeedbackCategories)
+  .where(eq(FeedbackCategories.websiteId, sampleWebsite.id)) : [];
+---
+
+<Layout title="Feedback API Demo">
+  <main class="container mx-auto px-4 py-8 max-w-4xl">
+    <h1 class="text-3xl font-bold mb-8 text-center">Astro Feedback API Demo</h1>
+
+    { sampleWebsite && 
+        <div class="space-y-8">
+        <!-- API Information -->
+        <section class="bg-blue-50 p-6 rounded-lg">
+          <h2 class="text-xl font-semibold mb-4">API Configuration</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <strong>Website ID:</strong> {sampleWebsite.id}
+            </div>
+            <div>
+              <strong>Domain:</strong> {sampleWebsite.domain}
+            </div>
+            <div>
+              <strong>API Key:</strong> 
+              <code class="bg-gray-200 px-2 py-1 rounded text-xs">{sampleWebsite.apiKey}</code>
+            </div>
+            <div>
+              <strong>Base URL:</strong> {Astro.url.origin}/api
+            </div>
+          </div>
+        </section>
+
+        <!-- Feedback Submission Form -->
+        <section class="bg-white border border-gray-200 p-6 rounded-lg">
+          <h2 class="text-xl font-semibold mb-4">Submit Feedback</h2>
+          <form id="feedback-form" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label for="type">Type</label>
+                <select id="type" name="type" required>
+                  <option value="bug">Bug Report</option>
+                  <option value="feature">Feature Request</option>
+                  <option value="improvement">Improvement</option>
+                  <option value="question">Question</option>
+                  <option value="compliment">Compliment</option>
+                  <option value="complaint">Complaint</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              
+              {categories.length > 0 && (
+                <div>
+                  <label for="category">Category</label>
+                  <select id="category" name="categoryId">
+                    <option value="">No category</option>
+                    {categories.map(cat => (
+                      <option value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label for="title">Title</label>
+              <input type="text" id="title" name="title" required>
+            </div>
+
+            <div>
+              <label for="description">Description</label>
+              <textarea id="description" name="description" rows="4" required></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label for="name">Name (optional)</label>
+                <input type="text" id="name" name="name">
+              </div>
+              <div>
+                <label for="email">Email (optional)</label>
+                <input type="email" id="email" name="email">
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary">
+              Submit Feedback
+            </button>
+          </form>
+
+          <div id="submit-result" class="mt-4"></div>
+        </section>
+
+        <!-- Recent Feedback -->
+        <section class="bg-white border border-gray-200 p-6 rounded-lg">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">Recent Feedback</h2>
+            <button id="refresh-feedback" class="btn-secondary btn-small">
+              Refresh
+            </button>
+          </div>
+          <div id="feedback-list" class="space-y-4">
+            Loading feedback...
+          </div>
+        </section>
+
+        <!-- API Examples -->
+        <section class="bg-gray-50 p-6 rounded-lg">
+          <h2 class="text-xl font-semibold mb-4">API Examples</h2>
+          
+          <div class="space-y-6">
+            <!-- Submit Feedback -->
+            <div>
+              <h3 class="font-medium mb-2">Submit Feedback</h3>
+              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>curl -X POST {Astro.url.origin}/api/feedback \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: {sampleWebsite.apiKey}" \\
+  -d '{JSON.stringify({
+    "websiteId": `${sampleWebsite.id}`,
+    "type": "bug",
+    "title": "Login button not working",
+    "description": "The login button doesn't respond when clicked",
+    "email": "user@example.com"
+  }, null, 2)}'</code></pre>
+            </div>
+
+            <!-- Get Feedback -->
+            <div>
+              <h3 class="font-medium mb-2">Get Feedback</h3>
+              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>curl "{Astro.url.origin}/api/feedback?websiteId={sampleWebsite.id}&limit=10" \\
+  -H "x-api-key: {sampleWebsite.apiKey}"</code></pre>
+            </div>
+
+            <!-- Vote on Feedback -->
+            <div>
+              <h3 class="font-medium mb-2">Vote on Feedback</h3>
+              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>curl -X POST {Astro.url.origin}/api/feedback/1/vote \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: {sampleWebsite.apiKey}" \\
+  -d '{JSON.stringify({"voteType": "up"})}'</code></pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    }
+    
+    <!-- {sampleWebsite ? (
+      
+    ) : (
+      <div class="text-center py-12">
+        <p class="text-gray-600 mb-4">No sample website found. Please run the database seed first:</p>
+        <code class="bg-gray-100 px-4 py-2 rounded">npm run db:seed</code>
+      </div>
+    )} -->
+  </main>
+</Layout>
+
+<script define:vars={{ websiteId: sampleWebsite?.id, apiKey: sampleWebsite?.apiKey, baseUrl: Astro.url.origin }}>
+  // Feedback submission
+  const form = document.getElementById('feedback-form');
+  const submitResult = document.getElementById('submit-result');
+  
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(form);
+      const data = {
+        websiteId: websiteId,
+        type: formData.get('type'),
+        title: formData.get('title'),
+        description: formData.get('description'),
+        name: formData.get('name') || undefined,
+        email: formData.get('email') || undefined,
+        categoryId: formData.get('categoryId') ? parseInt(formData.get('categoryId')) : undefined
+      };
+
+      try {
+        const response = await fetch(`${baseUrl}/api/feedback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey
+          },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          submitResult.innerHTML = `
+            <div class="alert alert-success">
+              Feedback submitted successfully! ID: ${result.data.id}
+            </div>
+          `;
+          form.reset();
+          loadFeedback(); // Refresh the feedback list
+        } else {
+          submitResult.innerHTML = `
+            <div class="alert alert-error">
+              Error: ${result.error}
+            </div>
+          `;
+        }
+      } catch (error) {
+        submitResult.innerHTML = `
+          <div class="alert alert-error">
+            Network error: ${error.message}
+          </div>
+        `;
+      }
+    });
+  }
+
+  // Load feedback
+  async function loadFeedback() {
+    const feedbackList = document.getElementById('feedback-list');
+
+    const urlBuilder = new URL(`${baseUrl}/api/feedback`);
+    urlBuilder.searchParams.append('websiteId', websiteId);
+    urlBuilder.searchParams.append('limit', '5');
+    urlBuilder.searchParams.append('public', 'true');
+    
+    try {
+      const response = await fetch(urlBuilder.toString(), {
+        headers: {
+          'x-api-key': apiKey
+        }
+      });
+
+      const result = await response.json();
+      
+      if (result.success && result.data.length > 0) {
+        feedbackList.innerHTML = result.data.map(item => `
+          <div class="border border-gray-200 p-4 rounded-md">
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-medium">${item.title}</h3>
+              <div class="flex items-center space-x-2 text-sm text-gray-500">
+                <span class="badge badge-${item.type}">${item.type}</span>
+                <span class="badge badge-${item.status}">${item.status}</span>
+              </div>
+            </div>
+            <p class="text-gray-600 text-sm mb-2">${item.description}</p>
+            <div class="flex justify-between items-center text-sm text-gray-500">
+              <span>${new Date(item.createdAt).toLocaleDateString()}</span>
+              <div class="flex items-center space-x-2">
+                <button onclick="vote(${item.id}, 'up')" class="vote-button upvote">
+                  <span>👍</span>
+                  <span>${item.upvotes}</span>
+                </button>
+                <button onclick="vote(${item.id}, 'down')" class="vote-button downvote">
+                  <span>👎</span>
+                  <span>${item.downvotes}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        feedbackList.innerHTML = '<p class="text-gray-500 text-center py-4">No feedback found.</p>';
+      }
+    } catch (error) {
+      feedbackList.innerHTML = `<p class="text-red-500 text-center py-4">Error loading feedback: ${error.message}</p>`;
+    }
+  }
+
+  // Vote on feedback
+  window.vote = async function(feedbackId, voteType) {
+    try {
+      const response = await fetch(`${baseUrl}/api/feedback/${feedbackId}/vote`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey
+        },
+        body: JSON.stringify({ voteType })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        loadFeedback(); // Refresh to show updated vote counts
+      } else {
+        alert('Error voting: ' + result.error);
+      }
+    } catch (error) {
+      alert('Error voting: ' + error.message);
+    }
+  };
+
+  // Helper functions (removed since we're using predefined badge classes)
+
+  // Refresh button
+  const refreshButton = document.getElementById('refresh-feedback');
+  if (refreshButton) {
+    refreshButton.addEventListener('click', loadFeedback);
+  }
+
+  // Load feedback on page load
+  if (websiteId && apiKey) {
+    loadFeedback();
+  }
+</script>
+
+<style>
+  pre code {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+</style>
+</Layout>
