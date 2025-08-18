@@ -1,0 +1,844 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import {
+    db,
+    Websites,
+    Feedback,
+    FeedbackCategories,
+    AdminUsers,
+} from "astro:db";
+import { eq, desc, and } from "astro:db";
+
+// Check admin authentication
+const sessionCookie = Astro.cookies.get("admin-session");
+let currentAdmin = null;
+
+if (sessionCookie) {
+    try {
+        const sessionData = JSON.parse(sessionCookie.value);
+        currentAdmin = await db
+            .select()
+            .from(AdminUsers)
+            .where(eq(AdminUsers.id, sessionData.adminId))
+            .get();
+
+        if (!currentAdmin || !currentAdmin.isActive) {
+            return Astro.redirect("/admin/login");
+        }
+    } catch (error) {
+        return Astro.redirect("/admin/login");
+    }
+} else {
+    return Astro.redirect("/admin/login");
+}
+
+// Get query parameters for filtering
+const url = new URL(Astro.request.url);
+const statusFilter = url.searchParams.get("status") || undefined;
+const typeFilter = url.searchParams.get("type") || undefined;
+const websiteFilter = url.searchParams.get("website") || undefined;
+const limit = parseInt(url.searchParams.get("limit") || "20");
+const offset = parseInt(url.searchParams.get("offset") || "0");
+
+// Build query conditions
+let conditions = [];
+if (statusFilter)
+    conditions.push(
+        eq(
+            Feedback.status,
+            statusFilter as
+                | "new"
+                | "in_review"
+                | "in_progress"
+                | "resolved"
+                | "closed"
+                | "spam",
+        ),
+    );
+if (typeFilter) 
+    conditions.push(
+        eq(
+            Feedback.type, 
+            typeFilter as
+                | "bug"
+                | "feature"
+                | "improvement"
+                | "question"
+                | "compliment"
+                | "complaint"
+                | "other"
+            ),
+    );
+if (websiteFilter)
+    conditions.push(eq(Feedback.websiteId, parseInt(websiteFilter)));
+
+// Get feedback with website and category info
+const feedbackQuery = db
+    .select({
+        id: Feedback.id,
+        websiteId: Feedback.websiteId,
+        websiteName: Websites.name,
+        categoryId: Feedback.categoryId,
+        categoryName: FeedbackCategories.name,
+        type: Feedback.type,
+        status: Feedback.status,
+        priority: Feedback.priority,
+        title: Feedback.title,
+        description: Feedback.description,
+        email: Feedback.email,
+        name: Feedback.name,
+        url: Feedback.url,
+        isPublic: Feedback.isPublic,
+        upvotes: Feedback.upvotes,
+        downvotes: Feedback.downvotes,
+        createdAt: Feedback.createdAt,
+        updatedAt: Feedback.updatedAt,
+    })
+    .from(Feedback)
+    .leftJoin(Websites, eq(Feedback.websiteId, Websites.id))
+    .leftJoin(
+        FeedbackCategories,
+        eq(Feedback.categoryId, FeedbackCategories.id),
+    )
+    .orderBy(desc(Feedback.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+if (conditions.length > 0) {
+    feedbackQuery.where(and(...conditions));
+}
+
+const feedback = await feedbackQuery;
+
+// Get websites for filter dropdown
+const websites = await db.select().from(Websites);
+
+// Get stats for different statuses
+const statusStats = {
+    new: 0,
+    in_review: 0,
+    in_progress: 0,
+    resolved: 0,
+    closed: 0,
+    spam: 0,
+};
+
+const allFeedback = await db.select({ status: Feedback.status }).from(Feedback);
+allFeedback.forEach((item) => {
+    if (statusStats.hasOwnProperty(item.status)) {
+        statusStats[item.status]++;
+    }
+});
+---
+
+<Layout title="Feedback Management - Admin Portal">
+    <div class="admin-layout">
+        <!-- Admin Header -->
+        <header class="admin-header">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center space-x-4">
+                        <h1 class="text-xl font-bold">Feedback Admin</h1>
+                        <nav class="admin-nav">
+                            <a href="/admin">Dashboard</a>
+                            <a href="/admin/websites">Websites</a>
+                            <a href="/admin/feedback" class="active">Feedback</a
+                            >
+                            <a href="/admin/users">Users</a>
+                            <a href="/admin/analytics">Analytics</a>
+                        </nav>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600"
+                            >Welcome, {currentAdmin.name}</span
+                        >
+                        <a href="/admin/logout" class="btn-secondary btn-small"
+                            >Logout</a
+                        >
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="container mx-auto px-4 py-8">
+                <!-- Page Header with Stats -->
+                <div class="page-header mb-8">
+                    <h2 class="text-2xl font-bold mb-4">Feedback Management</h2>
+
+                    <!-- Status Stats -->
+                    <div class="status-stats">
+                        <a
+                            href="/admin/feedback"
+                            class={`stat-item ${!statusFilter ? "active" : ""}`}
+                        >
+                            <span class="stat-label">All</span>
+                            <span class="stat-count">{feedback.length}</span>
+                        </a>
+                        <a
+                            href="/admin/feedback?status=new"
+                            class={`stat-item ${statusFilter === "new" ? "active" : ""}`}
+                        >
+                            <span class="stat-label">New</span>
+                            <span class="stat-count">{statusStats.new}</span>
+                        </a>
+                        <a
+                            href="/admin/feedback?status=in_review"
+                            class={`stat-item ${statusFilter === "in_review" ? "active" : ""}`}
+                        >
+                            <span class="stat-label">In Review</span>
+                            <span class="stat-count"
+                                >{statusStats.in_review}</span
+                            >
+                        </a>
+                        <a
+                            href="/admin/feedback?status=in_progress"
+                            class={`stat-item ${statusFilter === "in_progress" ? "active" : ""}`}
+                        >
+                            <span class="stat-label">In Progress</span>
+                            <span class="stat-count"
+                                >{statusStats.in_progress}</span
+                            >
+                        </a>
+                        <a
+                            href="/admin/feedback?status=resolved"
+                            class={`stat-item ${statusFilter === "resolved" ? "active" : ""}`}
+                        >
+                            <span class="stat-label">Resolved</span>
+                            <span class="stat-count"
+                                >{statusStats.resolved}</span
+                            >
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filters-section mb-6">
+                    <form class="filters-form" method="GET">
+                        <div class="filter-group">
+                            <label for="website">Website</label>
+                            <select name="website" id="website">
+                                <option value="">All websites</option>
+                                {
+                                    websites.map((website) => (
+                                        <option
+                                            value={website.id}
+                                            selected={
+                                                websiteFilter ===
+                                                website.id.toString()
+                                            }
+                                        >
+                                            {website.name}
+                                        </option>
+                                    ))
+                                }
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="type">Type</label>
+                            <select name="type" id="type">
+                                <option value="">All types</option>
+                                <option
+                                    value="bug"
+                                    selected={typeFilter === "bug"}
+                                    >Bug Report</option
+                                >
+                                <option
+                                    value="feature"
+                                    selected={typeFilter === "feature"}
+                                    >Feature Request</option
+                                >
+                                <option
+                                    value="improvement"
+                                    selected={typeFilter === "improvement"}
+                                    >Improvement</option
+                                >
+                                <option
+                                    value="question"
+                                    selected={typeFilter === "question"}
+                                    >Question</option
+                                >
+                                <option
+                                    value="compliment"
+                                    selected={typeFilter === "compliment"}
+                                    >Compliment</option
+                                >
+                                <option
+                                    value="complaint"
+                                    selected={typeFilter === "complaint"}
+                                    >Complaint</option
+                                >
+                                <option
+                                    value="other"
+                                    selected={typeFilter === "other"}
+                                    >Other</option
+                                >
+                            </select>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="status">Status</label>
+                            <select name="status" id="status">
+                                <option value="">All statuses</option>
+                                <option
+                                    value="new"
+                                    selected={statusFilter === "new"}
+                                    >New</option
+                                >
+                                <option
+                                    value="in_review"
+                                    selected={statusFilter === "in_review"}
+                                    >In Review</option
+                                >
+                                <option
+                                    value="in_progress"
+                                    selected={statusFilter === "in_progress"}
+                                    >In Progress</option
+                                >
+                                <option
+                                    value="resolved"
+                                    selected={statusFilter === "resolved"}
+                                    >Resolved</option
+                                >
+                                <option
+                                    value="closed"
+                                    selected={statusFilter === "closed"}
+                                    >Closed</option
+                                >
+                                <option
+                                    value="spam"
+                                    selected={statusFilter === "spam"}
+                                    >Spam</option
+                                >
+                            </select>
+                        </div>
+
+                        <div class="filter-actions">
+                            <button type="submit" class="btn-primary btn-small"
+                                >Apply Filters</button
+                            >
+                            <a
+                                href="/admin/feedback"
+                                class="btn-secondary btn-small">Clear</a
+                            >
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Feedback List -->
+                <div class="feedback-list">
+                    {
+                        feedback.length === 0 ? (
+                            <div class="empty-state">
+                                <div class="empty-icon">💬</div>
+                                <h3>No feedback found</h3>
+                                <p>No feedback matches your current filters.</p>
+                                <a href="/admin/feedback" class="btn-primary">
+                                    Clear Filters
+                                </a>
+                            </div>
+                        ) : (
+                            <div class="feedback-cards">
+                                {feedback.map((item) => (
+                                    <div class="feedback-card">
+                                        <div class="feedback-header">
+                                            <div class="feedback-meta">
+                                                <span
+                                                    class={`badge badge-${item.type}`}
+                                                >
+                                                    {item.type}
+                                                </span>
+                                                <span
+                                                    class={`badge badge-${item.status}`}
+                                                >
+                                                    {item.status}
+                                                </span>
+                                                {item.priority !== "medium" && (
+                                                    <span
+                                                        class={`badge badge-priority-${item.priority}`}
+                                                    >
+                                                        {item.priority}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div class="feedback-actions">
+                                                <select
+                                                    class="status-select"
+                                                    data-feedback-id={item.id}
+                                                    onchange={`updateStatus(${item.id}, this.value)`}
+                                                >
+                                                    <option
+                                                        value="new"
+                                                        selected={
+                                                            item.status ===
+                                                            "new"
+                                                        }
+                                                    >
+                                                        New
+                                                    </option>
+                                                    <option
+                                                        value="in_review"
+                                                        selected={
+                                                            item.status ===
+                                                            "in_review"
+                                                        }
+                                                    >
+                                                        In Review
+                                                    </option>
+                                                    <option
+                                                        value="in_progress"
+                                                        selected={
+                                                            item.status ===
+                                                            "in_progress"
+                                                        }
+                                                    >
+                                                        In Progress
+                                                    </option>
+                                                    <option
+                                                        value="resolved"
+                                                        selected={
+                                                            item.status ===
+                                                            "resolved"
+                                                        }
+                                                    >
+                                                        Resolved
+                                                    </option>
+                                                    <option
+                                                        value="closed"
+                                                        selected={
+                                                            item.status ===
+                                                            "closed"
+                                                        }
+                                                    >
+                                                        Closed
+                                                    </option>
+                                                    <option
+                                                        value="spam"
+                                                        selected={
+                                                            item.status ===
+                                                            "spam"
+                                                        }
+                                                    >
+                                                        Spam
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="feedback-content">
+                                            <h3 class="feedback-title">
+                                                {item.title}
+                                            </h3>
+                                            <p class="feedback-description">
+                                                {item.description}
+                                            </p>
+
+                                            <div class="feedback-details">
+                                                <div class="detail-item">
+                                                    <strong>Website:</strong>{" "}
+                                                    {item.websiteName}
+                                                </div>
+                                                {item.categoryName && (
+                                                    <div class="detail-item">
+                                                        <strong>
+                                                            Category:
+                                                        </strong>{" "}
+                                                        {item.categoryName}
+                                                    </div>
+                                                )}
+                                                {item.url && (
+                                                    <div class="detail-item">
+                                                        <strong>URL:</strong>
+                                                        <a
+                                                            href={item.url}
+                                                            target="_blank"
+                                                            class="url-link"
+                                                        >
+                                                            {item.url}
+                                                        </a>
+                                                    </div>
+                                                )}
+                                                {item.email && (
+                                                    <div class="detail-item">
+                                                        <strong>
+                                                            Contact:
+                                                        </strong>
+                                                        {item.name
+                                                            ? `${item.name} (${item.email})`
+                                                            : item.email}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div class="feedback-footer">
+                                            <div class="feedback-stats">
+                                                <span class="vote-stat">
+                                                    👍 {item.upvotes}
+                                                </span>
+                                                <span class="vote-stat">
+                                                    👎 {item.downvotes}
+                                                </span>
+                                                <span class="visibility-stat">
+                                                    {item.isPublic
+                                                        ? "👁️ Public"
+                                                        : "🔒 Private"}
+                                                </span>
+                                            </div>
+                                            <div class="feedback-date">
+                                                {new Date(
+                                                    item.createdAt,
+                                                ).toLocaleDateString()}{" "}
+                                                at{" "}
+                                                {new Date(
+                                                    item.createdAt,
+                                                ).toLocaleTimeString()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    }
+                </div>
+
+                <!-- Pagination -->
+                {
+                    feedback.length === limit && (
+                        <div class="pagination">
+                            <a
+                                href={`/admin/feedback?offset=${Math.max(0, offset - limit)}&limit=${limit}&status=${statusFilter}&type=${typeFilter}&website=${websiteFilter}`}
+                                class="btn-secondary"
+                            >
+                                Previous
+                            </a>
+                            <a
+                                href={`/admin/feedback?offset=${offset + limit}&limit=${limit}&status=${statusFilter}&type=${typeFilter}&website=${websiteFilter}`}
+                                class="btn-secondary"
+                            >
+                                Next
+                            </a>
+                        </div>
+                    )
+                }
+            </div>
+        </main>
+    </div>
+</Layout>
+
+<script is:inline>
+    // Update feedback status
+    window.updateStatus = async function (feedbackId, newStatus) {
+        try {
+            const response = await fetch(
+                `/admin/api/feedback/${feedbackId}/status`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ status: newStatus }),
+                },
+            );
+
+            if (response.ok) {
+                // Update the badge in the UI
+                const card = document
+                    .querySelector(`[data-feedback-id="${feedbackId}"]`)
+                    .closest(".feedback-card");
+                const statusBadge = card.querySelector(
+                    ".badge-new, .badge-in_review, .badge-in_progress, .badge-resolved, .badge-closed, .badge-spam",
+                );
+                if (statusBadge) {
+                    statusBadge.className = `badge badge-${newStatus}`;
+                    statusBadge.textContent = newStatus.replace("_", " ");
+                }
+            } else {
+                alert("Failed to update status");
+            }
+        } catch (error) {
+            alert("Error updating status");
+            console.error("Update failed:", error);
+        }
+    };
+</script>
+
+<style>
+    .admin-layout {
+        min-height: 100vh;
+        background: #f8fafc;
+    }
+
+    .admin-header {
+        background: white;
+        border-bottom: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .admin-nav {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .admin-nav a {
+        color: #6b7280;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.5rem 0;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .admin-nav a:hover,
+    .admin-nav a.active {
+        color: #2563eb;
+        border-bottom-color: #2563eb;
+    }
+
+    .status-stats {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s;
+        min-width: 80px;
+    }
+
+    .stat-item:hover,
+    .stat-item.active {
+        border-color: #2563eb;
+        background: #eff6ff;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-count {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #1f2937;
+    }
+
+    .filters-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+    }
+
+    .filters-form {
+        display: flex;
+        gap: 1rem;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        min-width: 150px;
+    }
+
+    .filter-group label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.25rem;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .feedback-cards {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    .feedback-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .feedback-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+
+    .feedback-meta {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .feedback-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .status-select {
+        padding: 0.25rem 0.5rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+        background: white;
+    }
+
+    .feedback-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0 0 0.5rem 0;
+    }
+
+    .feedback-description {
+        color: #6b7280;
+        margin: 0 0 1rem 0;
+        line-height: 1.6;
+    }
+
+    .feedback-details {
+        display: grid;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .detail-item {
+        font-size: 0.875rem;
+        color: #374151;
+    }
+
+    .detail-item strong {
+        color: #1f2937;
+    }
+
+    .url-link {
+        color: #2563eb;
+        text-decoration: none;
+        word-break: break-all;
+    }
+
+    .url-link:hover {
+        text-decoration: underline;
+    }
+
+    .feedback-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 1rem;
+        border-top: 1px solid #f3f4f6;
+    }
+
+    .feedback-stats {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .vote-stat,
+    .visibility-stat {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+
+    .feedback-date {
+        font-size: 0.875rem;
+        color: #9ca3af;
+    }
+
+    .badge-priority-high {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .badge-priority-urgent {
+        background: #fecaca;
+        color: #7f1d1d;
+    }
+
+    .badge-priority-low {
+        background: #f0f9ff;
+        color: #0c4a6e;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: white;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: #6b7280;
+        margin-bottom: 2rem;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .admin-nav {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filters-form {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .filter-group {
+            min-width: auto;
+        }
+
+        .feedback-header,
+        .feedback-footer {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 1rem;
+        }
+
+        .status-stats {
+            justify-content: center;
+        }
+    }
+</style>

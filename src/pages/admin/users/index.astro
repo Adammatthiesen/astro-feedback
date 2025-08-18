@@ -1,0 +1,632 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { db, AdminUsers } from "astro:db";
+import { eq, desc } from "astro:db";
+
+// Check admin authentication
+const sessionCookie = Astro.cookies.get("admin-session");
+let currentAdmin: any = null;
+
+if (sessionCookie) {
+    try {
+        const sessionData = JSON.parse(sessionCookie.value);
+        currentAdmin = await db
+            .select()
+            .from(AdminUsers)
+            .where(eq(AdminUsers.id, sessionData.adminId))
+            .get();
+
+        if (!currentAdmin || !currentAdmin.isActive) {
+            return Astro.redirect("/admin/login");
+        }
+    } catch (error) {
+        return Astro.redirect("/admin/login");
+    }
+} else {
+    return Astro.redirect("/admin/login");
+}
+
+// Get all admin users
+const adminUsers = await db
+    .select()
+    .from(AdminUsers)
+    .orderBy(desc(AdminUsers.createdAt));
+
+// Handle form submission for creating new admin
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const name = formData.get("name") as string;
+        const email = formData.get("email") as string;
+        const password = formData.get("password") as string;
+        const role = formData.get("role") as 'admin' | 'moderator' | 'viewer';
+
+        if (!name || !email || !password || !role) {
+            throw new Error("All fields are required");
+        }
+
+        // Check if email already exists
+        const existingUser = await db
+            .select()
+            .from(AdminUsers)
+            .where(eq(AdminUsers.email, email))
+            .get();
+
+        if (existingUser) {
+            throw new Error("Email already exists");
+        }
+
+        // Create new admin user (Note: In production, hash the password!)
+        await db.insert(AdminUsers).values({
+            name,
+            email,
+            password, // In production: await bcrypt.hash(password, 10)
+            role,
+            isActive: true,
+            createdAt: new Date(),
+        });
+
+        return Astro.redirect("/admin/users?success=created");
+    } catch (error) {
+        console.error("Create admin error:", error);
+    }
+}
+---
+
+<Layout title="User Management - Admin Portal">
+    <div class="admin-layout">
+        <!-- Admin Header -->
+        <header class="admin-header">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center space-x-4">
+                        <h1 class="text-xl font-bold">Feedback Admin</h1>
+                        <nav class="admin-nav">
+                            <a href="/admin">Dashboard</a>
+                            <a href="/admin/websites">Websites</a>
+                            <a href="/admin/feedback">Feedback</a>
+                            <a href="/admin/users" class="active">Users</a>
+                            <a href="/admin/analytics">Analytics</a>
+                        </nav>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600"
+                            >Welcome, {currentAdmin.name}</span
+                        >
+                        <a href="/admin/logout" class="btn-secondary btn-small"
+                            >Logout</a
+                        >
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="container mx-auto px-4 py-8">
+                <!-- Page Header -->
+                <div class="page-header mb-8">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-bold">User Management</h2>
+                        <button
+                            onclick="document.getElementById('add-user-modal').style.display = 'flex'"
+                            class="btn-primary"
+                        >
+                            Add New Admin
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="users-table-container">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {
+                                adminUsers.map((user) => (
+                                    <tr>
+                                        <td>
+                                            <div class="user-info">
+                                                <div class="user-avatar">
+                                                    {user.name
+                                                        .charAt(0)
+                                                        .toUpperCase()}
+                                                </div>
+                                                <span class="user-name">
+                                                    {user.name}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>{user.email}</td>
+                                        <td>
+                                            <span
+                                                class={`badge badge-${user.role}`}
+                                            >
+                                                {user.role}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span
+                                                class={`status-badge ${user.isActive ? "active" : "inactive"}`}
+                                            >
+                                                {user.isActive
+                                                    ? "Active"
+                                                    : "Inactive"}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {new Date(
+                                                user.createdAt,
+                                            ).toLocaleDateString()}
+                                        </td>
+                                        <td>
+                                            <div class="action-buttons">
+                                                {user.id !==
+                                                    currentAdmin.id && (
+                                                    <>
+                                                        <button
+                                                            onclick={`toggleUserStatus(${user.id}, ${!user.isActive})`}
+                                                            class={`btn-small ${user.isActive ? "btn-secondary" : "btn-primary"}`}
+                                                        >
+                                                            {user.isActive
+                                                                ? "Deactivate"
+                                                                : "Activate"}
+                                                        </button>
+                                                        <button
+                                                            onclick={`deleteUser(${user.id})`}
+                                                            class="btn-small btn-danger"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {user.id ===
+                                                    currentAdmin.id && (
+                                                    <span class="text-sm text-gray-500">
+                                                        Current User
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                {
+                    adminUsers.length === 0 && (
+                        <div class="empty-state">
+                            <div class="empty-icon">👥</div>
+                            <h3>No admin users found</h3>
+                            <p>Create your first admin user to get started.</p>
+                        </div>
+                    )
+                }
+            </div>
+        </main>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="add-user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Admin User</h3>
+                <button
+                    onclick="document.getElementById('add-user-modal').style.display = 'none'"
+                    class="modal-close"
+                >
+                    ×
+                </button>
+            </div>
+
+            <form method="POST" class="add-user-form">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" name="name" required />
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required />
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        minlength="6"
+                    />
+                    <small class="form-hint">Minimum 6 characters</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="role">Role</label>
+                    <select id="role" name="role" required>
+                        <option value="">Select a role</option>
+                        <option value="admin">Admin</option>
+                        <option value="moderator">Moderator</option>
+                        <option value="viewer">Viewer</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary"
+                        >Create Admin User</button
+                    >
+                    <button
+                        type="button"
+                        onclick="document.getElementById('add-user-modal').style.display = 'none'"
+                        class="btn-secondary"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</Layout>
+
+<script is:inline>
+    // Toggle user status
+    window.toggleUserStatus = async function (userId, newStatus) {
+        try {
+            const response = await fetch(`/admin/api/users/${userId}/status`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ isActive: newStatus }),
+            });
+
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert("Failed to update user status");
+            }
+        } catch (error) {
+            alert("Error updating user status");
+            console.error("Update failed:", error);
+        }
+    };
+
+    // Delete user
+    window.deleteUser = async function (userId) {
+        if (
+            !confirm(
+                "Are you sure you want to delete this user? This action cannot be undone.",
+            )
+        ) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/admin/api/users/${userId}`, {
+                method: "DELETE",
+            });
+
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert("Failed to delete user");
+            }
+        } catch (error) {
+            alert("Error deleting user");
+            console.error("Delete failed:", error);
+        }
+    };
+
+    // Close modal when clicking outside
+    document
+        .getElementById("add-user-modal")
+        ?.addEventListener("click", function (e) {
+            if (e.target === this) {
+                this.style.display = "none";
+            }
+        });
+</script>
+
+<style>
+    .admin-layout {
+        min-height: 100vh;
+        background: #f8fafc;
+    }
+
+    .admin-header {
+        background: white;
+        border-bottom: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .admin-nav {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .admin-nav a {
+        color: #6b7280;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.5rem 0;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .admin-nav a:hover,
+    .admin-nav a.active {
+        color: #2563eb;
+        border-bottom-color: #2563eb;
+    }
+
+    .users-table-container {
+        background: white;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .users-table th,
+    .users-table td {
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .users-table th {
+        background: #f9fafb;
+        font-weight: 600;
+        color: #374151;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .users-table tbody tr:hover {
+        background: #f9fafb;
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .user-avatar {
+        width: 2.5rem;
+        height: 2.5rem;
+        background: #2563eb;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .user-name {
+        font-weight: 500;
+        color: #1f2937;
+    }
+
+    .badge-admin {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .badge-moderator {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .badge-viewer {
+        background: #f3f4f6;
+        color: #374151;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .status-badge.active {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-badge.inactive {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .btn-danger {
+        background: #dc2626;
+        color: white;
+        border: 1px solid #dc2626;
+    }
+
+    .btn-danger:hover {
+        background: #b91c1c;
+        border-color: #b91c1c;
+    }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 0.5rem;
+        padding: 0;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .modal-header h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #6b7280;
+        cursor: pointer;
+        padding: 0;
+        width: 2rem;
+        height: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-close:hover {
+        color: #374151;
+    }
+
+    .add-user-form {
+        padding: 1.5rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.25rem;
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        transition: border-color 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .form-hint {
+        display: block;
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+        padding-top: 1rem;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: white;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: #6b7280;
+    }
+
+    @media (max-width: 768px) {
+        .admin-nav {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .users-table-container {
+            overflow-x: auto;
+        }
+
+        .users-table {
+            min-width: 600px;
+        }
+
+        .modal-content {
+            width: 95%;
+            margin: 1rem;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+    }
+</style>

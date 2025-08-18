@@ -55,13 +55,25 @@ export default async function seed() {
     }
   ]).returning();
 
-  // Create sample admin user
-  await db.insert(AdminUsers).values({
-    email: 'admin@example.com',
-    name: 'Admin User',
-    role: 'admin',
-    isActive: true
-  });
+  // Create admin users
+  await db.insert(AdminUsers).values([
+    {
+      email: 'admin@example.com',
+      password: 'admin123', // In production: await bcrypt.hash('admin123', 10)
+      name: 'Admin User',
+      role: 'admin',
+      isActive: true,
+      createdAt: new Date()
+    },
+    {
+      email: 'moderator@example.com',
+      password: 'mod123', // In production: await bcrypt.hash('mod123', 10)
+      name: 'Moderator User',
+      role: 'moderator',
+      isActive: true,
+      createdAt: new Date()
+    }
+  ]);
 
   // Create sample feedback entries
   await db.insert(Feedback).values([

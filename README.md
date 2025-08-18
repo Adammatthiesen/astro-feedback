@@ -24,25 +24,13 @@ git clone <repository-url>
 cd feedback
 
 # Install dependencies
-npm install
-
-# Set up the database
-npm run db:seed
+pnpm install
 ```
 
-### 2. Environment Setup
-
-Create a `.env` file:
-
-```env
-# Admin access key (optional, for admin endpoints)
-ADMIN_KEY=your-super-secret-admin-key
-```
-
-### 3. Start Development Server
+### 2. Start Development Server
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Visit `http://localhost:4321` to see the demo interface.

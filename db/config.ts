@@ -132,6 +132,7 @@ const AdminUsers = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
     email: column.text({ unique: true }),
+    password: column.text(),
     name: column.text(),
     role: column.text({ enum: ['admin', 'moderator', 'viewer'], default: 'viewer' }),
     isActive: column.boolean({ default: true }),

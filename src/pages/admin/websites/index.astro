@@ -1,0 +1,476 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { db, Websites, AdminUsers } from "astro:db";
+import { eq } from "astro:db";
+
+// Check admin authentication
+const sessionCookie = Astro.cookies.get("admin-session");
+let currentAdmin = null;
+
+if (sessionCookie) {
+    try {
+        const sessionData = JSON.parse(sessionCookie.value);
+        currentAdmin = await db
+            .select()
+            .from(AdminUsers)
+            .where(eq(AdminUsers.id, sessionData.adminId))
+            .get();
+
+        if (!currentAdmin || !currentAdmin.isActive) {
+            return Astro.redirect("/admin/login");
+        }
+    } catch (error) {
+        return Astro.redirect("/admin/login");
+    }
+} else {
+    return Astro.redirect("/admin/login");
+}
+
+// Get all websites
+const websites = await db.select().from(Websites);
+---
+
+<Layout title="Websites - Admin Portal">
+    <div class="admin-layout">
+        <!-- Admin Header -->
+        <header class="admin-header">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center space-x-4">
+                        <h1 class="text-xl font-bold">Feedback Admin</h1>
+                        <nav class="admin-nav">
+                            <a href="/admin">Dashboard</a>
+                            <a href="/admin/websites" class="active">Websites</a
+                            >
+                            <a href="/admin/feedback">Feedback</a>
+                            <a href="/admin/users">Users</a>
+                            <a href="/admin/analytics">Analytics</a>
+                        </nav>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600"
+                            >Welcome, {currentAdmin.name}</span
+                        >
+                        <a href="/admin/logout" class="btn-secondary btn-small"
+                            >Logout</a
+                        >
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="container mx-auto px-4 py-8">
+                <div class="page-header">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 class="text-2xl font-bold">Websites</h2>
+                            <p class="text-gray-600">
+                                Manage registered websites and their API keys
+                            </p>
+                        </div>
+                        <a href="/admin/websites/new" class="btn-primary">
+                            Add Website
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Websites Table -->
+                <div class="data-table">
+                    {
+                        websites.length === 0 ? (
+                            <div class="empty-state">
+                                <div class="empty-icon">🌐</div>
+                                <h3>No websites registered</h3>
+                                <p>
+                                    Get started by adding your first website to
+                                    collect feedback.
+                                </p>
+                                <a
+                                    href="/admin/websites/new"
+                                    class="btn-primary"
+                                >
+                                    Add Website
+                                </a>
+                            </div>
+                        ) : (
+                            <div class="table-container">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Domain</th>
+                                            <th>Status</th>
+                                            <th>API Key</th>
+                                            <th>Created</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {websites.map((website) => (
+                                            <tr>
+                                                <td>
+                                                    <div class="website-info">
+                                                        <strong>
+                                                            {website.name}
+                                                        </strong>
+                                                        {website.description && (
+                                                            <div class="text-sm text-gray-500">
+                                                                {
+                                                                    website.description
+                                                                }
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <code class="domain-code">
+                                                        {website.domain}
+                                                    </code>
+                                                </td>
+                                                <td>
+                                                    <span
+                                                        class={`status-badge ${website.isActive ? "active" : "inactive"}`}
+                                                    >
+                                                        {website.isActive
+                                                            ? "Active"
+                                                            : "Inactive"}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="api-key-cell">
+                                                        <code
+                                                            class="api-key"
+                                                            data-key={
+                                                                website.apiKey
+                                                            }
+                                                        >
+                                                            {website.apiKey.substring(
+                                                                0,
+                                                                8,
+                                                            )}
+                                                            ...
+                                                        </code>
+                                                        <button
+                                                            class="copy-btn"
+                                                            onclick={`copyApiKey('${website.apiKey}')`}
+                                                        >
+                                                            📋
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="date">
+                                                        {new Date(
+                                                            website.createdAt,
+                                                        ).toLocaleDateString()}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="action-buttons">
+                                                        <a
+                                                            href={`/admin/websites/${website.id}`}
+                                                            class="btn-secondary btn-small"
+                                                        >
+                                                            View
+                                                        </a>
+                                                        <a
+                                                            href={`/admin/websites/${website.id}/edit`}
+                                                            class="btn-secondary btn-small"
+                                                        >
+                                                            Edit
+                                                        </a>
+                                                        <button
+                                                            class="btn-danger btn-small"
+                                                            onclick={`deleteWebsite(${website.id}, '${website.name}')`}
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                    }
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Copy notification -->
+    <div id="copy-notification" class="copy-notification">
+        API Key copied to clipboard!
+    </div>
+</Layout>
+
+<script is:inline>
+    // Copy API key to clipboard
+    window.copyApiKey = function (apiKey) {
+        navigator.clipboard
+            .writeText(apiKey)
+            .then(() => {
+                const notification =
+                    document.getElementById("copy-notification");
+                notification.classList.add("show");
+
+                setTimeout(() => {
+                    notification.classList.remove("show");
+                }, 2000);
+            })
+            .catch((err) => {
+                alert("Failed to copy API key");
+                console.error("Copy failed:", err);
+            });
+    };
+
+    // Delete website with confirmation
+    window.deleteWebsite = function (websiteId, websiteName) {
+        if (
+            confirm(
+                `Are you sure you want to delete "${websiteName}"? This action cannot be undone and will also delete all associated feedback.`,
+            )
+        ) {
+            // In a real implementation, this would make an API call
+            fetch(`/admin/api/websites/${websiteId}`, {
+                method: "DELETE",
+            })
+                .then((response) => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert("Failed to delete website");
+                    }
+                })
+                .catch((err) => {
+                    alert("Error deleting website");
+                    console.error("Delete failed:", err);
+                });
+        }
+    };
+</script>
+
+<style>
+    .admin-layout {
+        min-height: 100vh;
+        background: #f8fafc;
+    }
+
+    .admin-header {
+        background: white;
+        border-bottom: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .admin-nav {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .admin-nav a {
+        color: #6b7280;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.5rem 0;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .admin-nav a:hover,
+    .admin-nav a.active {
+        color: #2563eb;
+        border-bottom-color: #2563eb;
+    }
+
+    .data-table {
+        background: white;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+        color: #6b7280;
+        margin-bottom: 2rem;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table th {
+        background: #f9fafb;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.875rem;
+    }
+
+    .table td {
+        padding: 1rem;
+        border-bottom: 1px solid #f3f4f6;
+        vertical-align: top;
+    }
+
+    .table tr:hover {
+        background: #f9fafb;
+    }
+
+    .website-info strong {
+        display: block;
+        color: #1f2937;
+    }
+
+    .domain-code {
+        background: #f3f4f6;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+        color: #374151;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .status-badge.active {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-badge.inactive {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .api-key-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .api-key {
+        background: #f3f4f6;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        color: #374151;
+    }
+
+    .copy-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 0.25rem;
+        transition: background-color 0.2s;
+    }
+
+    .copy-btn:hover {
+        background: #f3f4f6;
+    }
+
+    .date {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-danger {
+        background-color: #dc2626;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-danger:hover {
+        background-color: #b91c1c;
+    }
+
+    .copy-notification {
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        background: #059669;
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateX(100%);
+        opacity: 0;
+        transition: all 0.3s ease;
+        z-index: 1000;
+    }
+
+    .copy-notification.show {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    @media (max-width: 768px) {
+        .admin-nav {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .page-header .flex {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 1rem;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+
+        .table th,
+        .table td {
+            padding: 0.75rem 0.5rem;
+            font-size: 0.875rem;
+        }
+    }
+</style>

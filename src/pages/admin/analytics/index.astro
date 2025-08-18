@@ -1,0 +1,622 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { db, Websites, Feedback, AnalyticsEvents, AdminUsers } from "astro:db";
+import { eq, desc, count, and, gte, lt } from "astro:db";
+
+// Check admin authentication
+const sessionCookie = Astro.cookies.get("admin-session");
+let currentAdmin: any = null;
+
+if (sessionCookie) {
+    try {
+        const sessionData = JSON.parse(sessionCookie.value);
+        currentAdmin = await db
+            .select()
+            .from(AdminUsers)
+            .where(eq(AdminUsers.id, sessionData.adminId))
+            .get();
+
+        if (!currentAdmin || !currentAdmin.isActive) {
+            return Astro.redirect("/admin/login");
+        }
+    } catch (error) {
+        return Astro.redirect("/admin/login");
+    }
+} else {
+    return Astro.redirect("/admin/login");
+}
+
+// Get date range from query params (default to last 30 days)
+const url = new URL(Astro.request.url);
+const daysParam = url.searchParams.get("days") || "30";
+const days = parseInt(daysParam);
+const startDate = new Date();
+startDate.setDate(startDate.getDate() - days);
+
+// Get basic stats
+const totalFeedback = await db
+    .select({ count: count() })
+    .from(Feedback)
+    .where(gte(Feedback.createdAt, startDate))
+    .get();
+
+const totalWebsites = await db.select({ count: count() }).from(Websites).get();
+
+// Get feedback by status for the date range
+const feedbackByStatus = await db
+    .select({
+        status: Feedback.status,
+        count: count(),
+    })
+    .from(Feedback)
+    .where(gte(Feedback.createdAt, startDate))
+    .groupBy(Feedback.status);
+
+// Get feedback by type for the date range
+const feedbackByType = await db
+    .select({
+        type: Feedback.type,
+        count: count(),
+    })
+    .from(Feedback)
+    .where(gte(Feedback.createdAt, startDate))
+    .groupBy(Feedback.type);
+
+// Get daily feedback counts for chart (last 30 days)
+const dailyFeedback: {
+    date: string;
+    count: number;
+}[] = [];
+for (let i = days - 1; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    date.setHours(0, 0, 0, 0);
+
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + 1);
+
+    const dayCount = await db
+        .select({ count: count() })
+        .from(Feedback)
+        .where(
+            and(
+                gte(Feedback.createdAt, date),
+                lt(Feedback.createdAt, nextDate),
+            ),
+        )
+        .get();
+
+    dailyFeedback.push({
+        date: date.toISOString().split("T")[0],
+        count: dayCount?.count || 0,
+    });
+}
+
+// Get top websites by feedback count
+const topWebsites = await db
+    .select({
+        websiteId: Feedback.websiteId,
+        websiteName: Websites.name,
+        count: count(),
+    })
+    .from(Feedback)
+    .leftJoin(Websites, eq(Feedback.websiteId, Websites.id))
+    .where(gte(Feedback.createdAt, startDate))
+    .groupBy(Feedback.websiteId, Websites.name)
+    .orderBy(desc(count()))
+    .limit(10);
+
+// Get recent analytics events
+const recentEvents = await db
+    .select({
+        eventType: AnalyticsEvents.eventType,
+        websiteId: AnalyticsEvents.websiteId,
+        websiteName: Websites.name,
+        createdAt: AnalyticsEvents.createdAt,
+    })
+    .from(AnalyticsEvents)
+    .leftJoin(Websites, eq(AnalyticsEvents.websiteId, Websites.id))
+    .where(gte(AnalyticsEvents.createdAt, startDate))
+    .orderBy(desc(AnalyticsEvents.createdAt))
+    .limit(20);
+---
+
+<Layout title="Analytics - Admin Portal">
+    <div class="admin-layout">
+        <!-- Admin Header -->
+        <header class="admin-header">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center space-x-4">
+                        <h1 class="text-xl font-bold">Feedback Admin</h1>
+                        <nav class="admin-nav">
+                            <a href="/admin">Dashboard</a>
+                            <a href="/admin/websites">Websites</a>
+                            <a href="/admin/feedback">Feedback</a>
+                            <a href="/admin/users">Users</a>
+                            <a href="/admin/analytics" class="active"
+                                >Analytics</a
+                            >
+                        </nav>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600"
+                            >Welcome, {currentAdmin.name}</span
+                        >
+                        <a href="/admin/logout" class="btn-secondary btn-small"
+                            >Logout</a
+                        >
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="container mx-auto px-4 py-8">
+                <!-- Page Header -->
+                <div class="page-header mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold">Analytics Dashboard</h2>
+
+                        <!-- Date Range Filter -->
+                        <div class="date-filter">
+                            <select
+                                onchange="window.location.href = '/admin/analytics?days=' + this.value"
+                                class="date-select"
+                            >
+                                <option value="7" selected={days === 7}
+                                    >Last 7 days</option
+                                >
+                                <option value="30" selected={days === 30}
+                                    >Last 30 days</option
+                                >
+                                <option value="90" selected={days === 90}
+                                    >Last 90 days</option
+                                >
+                                <option value="365" selected={days === 365}
+                                    >Last year</option
+                                >
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Overview Stats -->
+                    <div class="overview-stats">
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-content">
+                                <div class="stat-value">
+                                    {totalFeedback?.count || 0}
+                                </div>
+                                <div class="stat-label">Total Feedback</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">🌐</div>
+                            <div class="stat-content">
+                                <div class="stat-value">
+                                    {totalWebsites?.count || 0}
+                                </div>
+                                <div class="stat-label">Active Websites</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-content">
+                                <div class="stat-value">
+                                    {
+                                        dailyFeedback.length > 1
+                                            ? Math.round(
+                                                  (dailyFeedback[
+                                                      dailyFeedback.length - 1
+                                                  ].count /
+                                                      Math.max(
+                                                          1,
+                                                          dailyFeedback[
+                                                              dailyFeedback.length -
+                                                                  2
+                                                          ].count,
+                                                      )) *
+                                                      100,
+                                              ) + "%"
+                                            : "N/A"
+                                    }
+                                </div>
+                                <div class="stat-label">Daily Change</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">⭐</div>
+                            <div class="stat-content">
+                                <div class="stat-value">
+                                    {
+                                        Math.round(
+                                            (totalFeedback?.count || 0) /
+                                                Math.max(1, days),
+                                        )
+                                    }
+                                </div>
+                                <div class="stat-label">Avg per Day</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="charts-section mb-8">
+                    <div class="chart-container">
+                        <h3 class="chart-title">Feedback Over Time</h3>
+                        <div class="chart-area">
+                            <div class="chart-bars">
+                                {
+                                    dailyFeedback.map((day, index) => {
+                                        const maxCount = Math.max(
+                                            ...dailyFeedback.map(
+                                                (d) => d.count,
+                                            ),
+                                            1,
+                                        );
+                                        const height = Math.max(
+                                            4,
+                                            (day.count / maxCount) * 100,
+                                        );
+                                        return (
+                                            <div class="chart-bar-container">
+                                                <div
+                                                    class="chart-bar"
+                                                    style={`height: ${height}%`}
+                                                    title={`${day.date}: ${day.count} feedback`}
+                                                />
+                                                <div class="chart-label">
+                                                    {index % 5 === 0
+                                                        ? new Date(
+                                                              day.date,
+                                                          ).getDate()
+                                                        : ""}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Tables -->
+                <div class="data-section">
+                    <div class="data-grid">
+                        <!-- Feedback by Status -->
+                        <div class="data-card">
+                            <h3 class="data-title">Feedback by Status</h3>
+                            <div class="data-list">
+                                {
+                                    feedbackByStatus.map((item) => (
+                                        <div class="data-item">
+                                            <span
+                                                class={`badge badge-${item.status}`}
+                                            >
+                                                {item.status}
+                                            </span>
+                                            <span class="data-value">
+                                                {item.count}
+                                            </span>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Feedback by Type -->
+                        <div class="data-card">
+                            <h3 class="data-title">Feedback by Type</h3>
+                            <div class="data-list">
+                                {
+                                    feedbackByType.map((item) => (
+                                        <div class="data-item">
+                                            <span
+                                                class={`badge badge-${item.type}`}
+                                            >
+                                                {item.type}
+                                            </span>
+                                            <span class="data-value">
+                                                {item.count}
+                                            </span>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Top Websites -->
+                        <div class="data-card">
+                            <h3 class="data-title">Top Websites</h3>
+                            <div class="data-list">
+                                {
+                                    topWebsites.map((item) => (
+                                        <div class="data-item">
+                                            <span class="website-name">
+                                                {item.websiteName}
+                                            </span>
+                                            <span class="data-value">
+                                                {item.count}
+                                            </span>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Recent Events -->
+                        <div class="data-card">
+                            <h3 class="data-title">Recent Activity</h3>
+                            <div class="events-list">
+                                {
+                                    recentEvents.map((event) => (
+                                        <div class="event-item">
+                                            <div class="event-type">
+                                                {event.eventType}
+                                            </div>
+                                            <div class="event-website">
+                                                {event.websiteName}
+                                            </div>
+                                            <div class="event-time">
+                                                {new Date(
+                                                    event.createdAt,
+                                                ).toLocaleString()}
+                                            </div>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</Layout>
+
+<style>
+    .admin-layout {
+        min-height: 100vh;
+        background: #f8fafc;
+    }
+
+    .admin-header {
+        background: white;
+        border-bottom: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .admin-nav {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .admin-nav a {
+        color: #6b7280;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.5rem 0;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .admin-nav a:hover,
+    .admin-nav a.active {
+        color: #2563eb;
+        border-bottom-color: #2563eb;
+    }
+
+    .date-filter {
+        display: flex;
+        align-items: center;
+    }
+
+    .date-select {
+        padding: 0.5rem 1rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        background: white;
+        font-size: 0.875rem;
+    }
+
+    .overview-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .stat-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #1f2937;
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+    }
+
+    .charts-section {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .chart-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 1.5rem;
+    }
+
+    .chart-area {
+        height: 200px;
+        position: relative;
+    }
+
+    .chart-bars {
+        display: flex;
+        align-items: end;
+        height: 100%;
+        gap: 2px;
+        padding: 0 1rem;
+    }
+
+    .chart-bar-container {
+        flex: 1;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: end;
+        align-items: center;
+    }
+
+    .chart-bar {
+        width: 100%;
+        background: linear-gradient(to top, #2563eb, #3b82f6);
+        border-radius: 2px 2px 0 0;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+
+    .chart-bar:hover {
+        background: linear-gradient(to top, #1d4ed8, #2563eb);
+    }
+
+    .chart-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 0.5rem;
+    }
+
+    .data-section {
+        margin-top: 2rem;
+    }
+
+    .data-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .data-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .data-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 1rem;
+    }
+
+    .data-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .data-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+
+    .data-item:last-child {
+        border-bottom: none;
+    }
+
+    .data-value {
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .website-name {
+        font-weight: 500;
+        color: #374151;
+    }
+
+    .events-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .event-item {
+        padding: 0.75rem;
+        background: #f9fafb;
+        border-radius: 0.375rem;
+        border: 1px solid #f3f4f6;
+    }
+
+    .event-type {
+        font-weight: 500;
+        color: #1f2937;
+        font-size: 0.875rem;
+    }
+
+    .event-website {
+        color: #6b7280;
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+
+    .event-time {
+        color: #9ca3af;
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+    }
+
+    @media (max-width: 768px) {
+        .admin-nav {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .overview-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .data-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .chart-bars {
+            padding: 0 0.5rem;
+        }
+    }
+</style>

@@ -1,0 +1,169 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+// Handle login form submission
+if (Astro.request.method === "POST") {
+    try {
+        const formData = await Astro.request.formData();
+        const email = formData.get("email") as string;
+        const password = formData.get("password") as string;
+
+        // Simple authentication - in production, use proper password hashing
+        if (email === "admin@example.com" && password === "admin123") {
+            // Create a simple session
+            const sessionData = {
+                adminId: 1,
+                email: email,
+                loginTime: Date.now(),
+            };
+
+            Astro.cookies.set("admin-session", JSON.stringify(sessionData), {
+                httpOnly: true,
+                secure: false, // Set to true in production with HTTPS
+                sameSite: "strict",
+                maxAge: 60 * 60 * 24 * 7, // 7 days
+            });
+
+            return Astro.redirect("/admin");
+        } else {
+            // Invalid credentials
+            return new Response("Invalid credentials", { status: 401 });
+        }
+    } catch (error) {
+        console.error("Login error:", error);
+        return new Response("Login failed", { status: 500 });
+    }
+}
+
+// Check if already logged in
+const sessionCookie = Astro.cookies.get("admin-session");
+if (sessionCookie) {
+    return Astro.redirect("/admin");
+}
+---
+
+<Layout title="Admin Login - Feedback API">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1 class="text-2xl font-bold text-center mb-2">Admin Login</h1>
+                <p class="text-gray-600 text-center mb-8">
+                    Sign in to manage your feedback system
+                </p>
+            </div>
+
+            <form method="POST" class="login-form">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        required
+                        value="admin@example.com"
+                        placeholder="Enter your email"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        value="admin123"
+                        placeholder="Enter your password"
+                    />
+                </div>
+
+                <button type="submit" class="btn-primary w-full">
+                    Sign In
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <div class="demo-credentials">
+                    <h3>Demo Credentials</h3>
+                    <p><strong>Email:</strong> admin@example.com</p>
+                    <p><strong>Password:</strong> admin123</p>
+                </div>
+
+                <p class="text-center text-sm text-gray-500 mt-6">
+                    <a href="/" class="text-blue-600 hover:underline"
+                        >← Back to Demo</a
+                    >
+                </p>
+            </div>
+        </div>
+    </div>
+</Layout>
+
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+    }
+
+    .login-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow:
+            0 20px 25px -5px rgba(0, 0, 0, 0.1),
+            0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        width: 100%;
+        max-width: 400px;
+    }
+
+    .login-header {
+        margin-bottom: 2rem;
+    }
+
+    .login-form {
+        margin-bottom: 2rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group:last-child {
+        margin-bottom: 2rem;
+    }
+
+    .demo-credentials {
+        background: #f8fafc;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 1rem;
+    }
+
+    .demo-credentials h3 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #475569;
+        margin: 0 0 0.5rem 0;
+    }
+
+    .demo-credentials p {
+        font-size: 0.875rem;
+        margin: 0.25rem 0;
+        color: #64748b;
+    }
+
+    .demo-credentials strong {
+        color: #334155;
+    }
+
+    @media (max-width: 480px) {
+        .login-card {
+            padding: 1.5rem;
+        }
+    }
+</style>

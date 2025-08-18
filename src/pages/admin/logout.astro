@@ -1,0 +1,5 @@
+---
+// Clear the admin session and redirect to login
+Astro.cookies.delete("admin-session");
+return Astro.redirect("/admin/login");
+---

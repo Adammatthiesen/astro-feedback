@@ -1,0 +1,314 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { db, AdminUsers, Websites, Feedback } from "astro:db";
+import { eq } from "astro:db";
+
+// Simple session check - in production, use proper session management
+const sessionCookie = Astro.cookies.get("admin-session");
+let currentAdmin = null;
+
+if (sessionCookie) {
+    try {
+        const sessionData = JSON.parse(sessionCookie.value);
+        currentAdmin = await db
+            .select()
+            .from(AdminUsers)
+            .where(eq(AdminUsers.id, sessionData.adminId))
+            .get();
+
+        if (!currentAdmin || !currentAdmin.isActive) {
+            currentAdmin = null;
+            Astro.cookies.delete("admin-session");
+        }
+    } catch (error) {
+        Astro.cookies.delete("admin-session");
+    }
+}
+
+// If not logged in, redirect to login
+if (!currentAdmin) {
+    return Astro.redirect("/admin/login");
+}
+
+// Get dashboard stats
+const stats = {
+    totalWebsites: 0,
+    totalFeedback: 0,
+    pendingFeedback: 0,
+    resolvedFeedback: 0,
+};
+
+try {
+    const websiteCount = await db.select().from(Websites);
+    stats.totalWebsites = websiteCount.length;
+
+    const feedbackCount = await db.select().from(Feedback);
+    stats.totalFeedback = feedbackCount.length;
+
+    const pendingCount = await db
+        .select()
+        .from(Feedback)
+        .where(eq(Feedback.status, "new"));
+    stats.pendingFeedback = pendingCount.length;
+
+    const resolvedCount = await db
+        .select()
+        .from(Feedback)
+        .where(eq(Feedback.status, "resolved"));
+    stats.resolvedFeedback = resolvedCount.length;
+} catch (error) {
+    console.error("Error fetching dashboard stats:", error);
+}
+---
+
+<Layout title="Admin Dashboard - Feedback API">
+    <div class="admin-layout">
+        <!-- Admin Header -->
+        <header class="admin-header">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center space-x-4">
+                        <h1 class="text-xl font-bold">Feedback Admin</h1>
+                        <nav class="admin-nav">
+                            <a href="/admin" class="active">Dashboard</a>
+                            <a href="/admin/websites">Websites</a>
+                            <a href="/admin/feedback">Feedback</a>
+                            <a href="/admin/users">Users</a>
+                            <a href="/admin/analytics">Analytics</a>
+                        </nav>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600"
+                            >Welcome, {currentAdmin.name}</span
+                        >
+                        <a href="/admin/logout" class="btn-secondary btn-small"
+                            >Logout</a
+                        >
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="container mx-auto px-4 py-8">
+                <!-- Dashboard Stats -->
+                <div class="dashboard-stats">
+                    <h2 class="text-2xl font-bold mb-6">Dashboard Overview</h2>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">🌐</div>
+                            <div class="stat-info">
+                                <h3>Total Websites</h3>
+                                <p class="stat-number">{stats.totalWebsites}</p>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-info">
+                                <h3>Total Feedback</h3>
+                                <p class="stat-number">{stats.totalFeedback}</p>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">⏳</div>
+                            <div class="stat-info">
+                                <h3>Pending</h3>
+                                <p class="stat-number">
+                                    {stats.pendingFeedback}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-info">
+                                <h3>Resolved</h3>
+                                <p class="stat-number">
+                                    {stats.resolvedFeedback}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <h3 class="text-xl font-semibold mb-4">Quick Actions</h3>
+                    <div class="action-grid">
+                        <a href="/admin/websites/new" class="action-card">
+                            <div class="action-icon">➕</div>
+                            <h4>Add Website</h4>
+                            <p>Register a new website to collect feedback</p>
+                        </a>
+
+                        <a
+                            href="/admin/feedback?status=new"
+                            class="action-card"
+                        >
+                            <div class="action-icon">👀</div>
+                            <h4>Review Feedback</h4>
+                            <p>Check new feedback submissions</p>
+                        </a>
+
+                        <a href="/admin/users/new" class="action-card">
+                            <div class="action-icon">👤</div>
+                            <h4>Add Admin User</h4>
+                            <p>Create a new admin account</p>
+                        </a>
+
+                        <a href="/admin/analytics" class="action-card">
+                            <div class="action-icon">📊</div>
+                            <h4>View Analytics</h4>
+                            <p>See feedback trends and insights</p>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</Layout>
+
+<style>
+    .admin-layout {
+        min-height: 100vh;
+        background: #f8fafc;
+    }
+
+    .admin-header {
+        background: white;
+        border-bottom: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .admin-nav {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .admin-nav a {
+        color: #6b7280;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.5rem 0;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .admin-nav a:hover,
+    .admin-nav a.active {
+        color: #2563eb;
+        border-bottom-color: #2563eb;
+    }
+
+    .admin-content {
+        flex: 1;
+    }
+
+    .dashboard-stats {
+        margin-bottom: 3rem;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .stat-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+        width: 3rem;
+        height: 3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f3f4f6;
+        border-radius: 0.5rem;
+    }
+
+    .stat-info h3 {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin: 0 0 0.25rem 0;
+        font-weight: 500;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #1f2937;
+        margin: 0;
+    }
+
+    .action-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .action-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        border-color: #2563eb;
+    }
+
+    .action-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+
+    .action-card h4 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin: 0 0 0.5rem 0;
+        color: #1f2937;
+    }
+
+    .action-card p {
+        color: #6b7280;
+        margin: 0;
+        font-size: 0.875rem;
+    }
+
+    @media (max-width: 768px) {
+        .admin-nav {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .stats-grid,
+        .action-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .stat-card {
+            flex-direction: column;
+            text-align: center;
+        }
+    }
+</style>
