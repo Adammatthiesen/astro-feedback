@@ -1,6 +1,7 @@
 ---
 import { AdminUsers, db, eq, Websites } from 'astro:db';
 import Layout from '../../../layouts/Layout.astro';
+import { generateWebsiteID } from '../../../lib/utils';
 
 // Check admin authentication
 const sessionCookie = Astro.cookies.get('admin-session');
@@ -61,6 +62,7 @@ if (Astro.request.method === 'POST') {
 			} else {
 				// Create website
 				await db.insert(Websites).values({
+					id: generateWebsiteID(),
 					name,
 					domain,
 					description: description || null,

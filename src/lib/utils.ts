@@ -10,6 +10,11 @@ import {
 } from 'astro:db';
 import crypto from 'node:crypto';
 
+export function generateWebsiteID(): number {
+	// Generate a random 8-digit number
+	return Math.floor(10000000 + Math.random() * 90000000);
+}
+
 /**
  * Verify API key and get website
  */
@@ -224,4 +229,58 @@ export async function checkRateLimit(
 		);
 
 	return recentRequests.length < maxRequests;
+}
+
+/**
+ * Hash password using scrypt
+ */
+export async function scryptHash(password: string, salt: string): Promise<string> {
+	return new Promise((resolve, reject) => {
+		crypto.scrypt(password, salt, 64, (err, derivedKey) => {
+			if (err) reject(err);
+			resolve(derivedKey.toString('hex'));
+		});
+	});
+}
+
+// Type for hashed password
+// ${string}:${string} represents the format "hashedPassword:salt"
+type HashedPassword = `${string}:${string}`;
+
+/**
+ * Check if a string is a valid hashed password
+ */
+export function isHashedPassword(value: string): value is HashedPassword {
+	const parts = value.split(':');
+	return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+}
+
+/**
+ * Parse a hashed password string into its components
+ */
+export function parseHashedPassword(value: string): { hashedPassword: string; salt: string } {
+	if (!isHashedPassword(value)) {
+		throw new Error('Invalid hashed password format');
+	}
+
+	const [hashedPassword, salt] = value.split(':');
+	return { hashedPassword, salt };
+}
+
+/**
+ * Hash a password and return it in the format "hashedPassword:salt"
+ */
+export async function hashPassword(password: string): Promise<HashedPassword> {
+	const salt = crypto.randomBytes(16).toString('hex');
+	const hashedPassword = await scryptHash(password, salt);
+	return `${hashedPassword}:${salt}` as HashedPassword;
+}
+
+/**
+ * Verify a password against a hashed password
+ */
+export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+	const { hashedPassword: storedHash, salt } = parseHashedPassword(hashedPassword);
+	const hash = await scryptHash(password, salt);
+	return hash === storedHash;
 }

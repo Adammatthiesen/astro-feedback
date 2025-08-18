@@ -1,6 +1,7 @@
 import { AdminUsers, db, eq, Websites } from 'astro:db';
 import type { APIRoute } from 'astro';
 import { z } from 'astro/zod';
+import { generateWebsiteID } from '../../../../lib/utils';
 
 const createWebsiteSchema = z.object({
 	name: z.string().min(1),
@@ -89,6 +90,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 		const newWebsite = await db
 			.insert(Websites)
 			.values({
+				id: generateWebsiteID(),
 				name,
 				domain,
 				description,

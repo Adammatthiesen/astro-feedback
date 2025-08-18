@@ -1,6 +1,7 @@
 ---
 import { AdminUsers, db, eq } from 'astro:db';
 import Layout from '../../../layouts/Layout.astro';
+import { hashPassword } from '../../../lib/utils';
 
 // Check admin authentication
 const sessionCookie = Astro.cookies.get('admin-session');
@@ -62,7 +63,7 @@ if (Astro.request.method === 'POST') {
 				await db.insert(AdminUsers).values({
 					name,
 					email,
-					password, // In production: await bcrypt.hash(password, 10)
+					password: await hashPassword(password),
 					role,
 					isActive,
 					createdAt: new Date(),
@@ -72,7 +73,7 @@ if (Astro.request.method === 'POST') {
 			}
 		}
 	} catch (err) {
-		error = 'Failed to create user: ' + (err as Error).message;
+		error = `Failed to create user: ${(err as Error).message}`;
 	}
 }
 ---

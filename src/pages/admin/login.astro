@@ -1,5 +1,7 @@
 ---
+import { AdminUsers, db, eq } from 'astro:db';
 import Layout from '../../layouts/Layout.astro';
+import { verifyPassword } from '../../lib/utils';
 
 // Handle login form submission
 if (Astro.request.method === 'POST') {
@@ -8,12 +10,14 @@ if (Astro.request.method === 'POST') {
 		const email = formData.get('email') as string;
 		const password = formData.get('password') as string;
 
+		const user = await db.select().from(AdminUsers).where(eq(AdminUsers.email, email)).get();
+
 		// Simple authentication - in production, use proper password hashing
-		if (email === 'admin@example.com' && password === 'admin123') {
+		if (user && (await verifyPassword(password, user.password))) {
 			// Create a simple session
 			const sessionData = {
-				adminId: 1,
-				email: email,
+				adminId: user.id,
+				email: user.email,
 				loginTime: Date.now(),
 			};
 

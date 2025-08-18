@@ -1,4 +1,5 @@
 import { AdminUsers, db, Feedback, FeedbackCategories, Websites } from 'astro:db';
+import { generateWebsiteID, hashPassword } from '../src/lib/utils';
 
 export default async function seed() {
 	console.log('🌱 Seeding database...');
@@ -7,7 +8,7 @@ export default async function seed() {
 	const website = await db
 		.insert(Websites)
 		.values({
-			id: 1,
+			id: generateWebsiteID(),
 			name: 'My Sample Website',
 			domain: 'example.com',
 			apiKey: 'sample-api-key-123',
@@ -65,7 +66,7 @@ export default async function seed() {
 	await db.insert(AdminUsers).values([
 		{
 			email: 'admin@example.com',
-			password: 'admin123', // In production: await bcrypt.hash('admin123', 10)
+			password: await hashPassword('admin123'),
 			name: 'Admin User',
 			role: 'admin',
 			isActive: true,
@@ -73,7 +74,7 @@ export default async function seed() {
 		},
 		{
 			email: 'moderator@example.com',
-			password: 'mod123', // In production: await bcrypt.hash('mod123', 10)
+			password: await hashPassword('mod123'),
 			name: 'Moderator User',
 			role: 'moderator',
 			isActive: true,
