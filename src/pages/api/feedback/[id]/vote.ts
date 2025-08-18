@@ -1,26 +1,7 @@
-import { and, db, eq, Feedback, FeedbackVotes, Websites } from 'astro:db';
+import { and, db, eq, Feedback, FeedbackVotes } from 'astro:db';
 import type { APIRoute } from 'astro';
 import { voteSchema } from '../../../../lib/schemas';
-
-async function verifyApiKey(websiteId: number, apiKey: string) {
-	const website = await db
-		.select()
-		.from(Websites)
-		.where(and(eq(Websites.id, websiteId), eq(Websites.apiKey, apiKey)))
-		.get();
-
-	if (!website || !website.isActive) {
-		return null;
-	}
-	return website;
-}
-
-function getClientInfo(request: Request) {
-	const ipAddress =
-		request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
-	const userAgent = request.headers.get('user-agent') || 'unknown';
-	return { ipAddress, userAgent };
-}
+import { getClientInfo, verifyApiKey } from '../../../../lib/utils';
 
 export const POST: APIRoute = async ({ params, request }) => {
 	try {

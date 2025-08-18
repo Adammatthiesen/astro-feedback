@@ -31,21 +31,17 @@ if (!currentAdmin) {
 }
 
 // Get statistics
-const dbResults = await Promise.all([
+const [websites, feedback] = await Promise.all([
 	db.select().from(Websites),
 	db.select().from(Feedback),
-	db.select().from(AdminUsers),
 ]);
-
-const websites = dbResults[0];
-const feedback = dbResults[1];
 
 // Get dashboard stats
 const stats = {
-	totalWebsites: websites.length || 0,
-	totalFeedback: feedback.length || 0,
-	pendingFeedback: feedback.filter((f) => f.status === 'new').length || 0,
-	resolvedFeedback: feedback.filter((f) => f.status === 'resolved').length || 0,
+	totalWebsites: websites.length,
+	totalFeedback: feedback.length,
+	pendingFeedback: feedback.filter((f) => f.status === 'new').length,
+	resolvedFeedback: feedback.filter((f) => f.status === 'resolved').length,
 };
 ---
 

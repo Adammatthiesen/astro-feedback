@@ -1,13 +1,7 @@
 import { AdminUsers, db, eq, Websites } from 'astro:db';
-import crypto from 'node:crypto';
 import type { APIRoute } from 'astro';
 import { websiteSchema } from '../../../lib/schemas';
-import { generateWebsiteID } from '../../../lib/utils';
-
-// Generate a secure API key
-function generateApiKey(): string {
-	return crypto.randomBytes(32).toString('hex');
-}
+import { generateApiKey, generateWebsiteID } from '../../../lib/utils';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
 	try {

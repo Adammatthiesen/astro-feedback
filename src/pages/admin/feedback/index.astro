@@ -91,10 +91,11 @@ if (conditions.length > 0) {
 	feedbackQuery.where(and(...conditions));
 }
 
-const feedback = await feedbackQuery;
-
-// Get websites for filter dropdown
-const websites = await db.select().from(Websites);
+const [feedback, websites, allFeedback] = await db.batch([
+	feedbackQuery,
+	db.select().from(Websites),
+	db.select({ status: Feedback.status }).from(Feedback),
+]);
 
 // Get stats for different statuses
 const statusStats = {
@@ -106,7 +107,6 @@ const statusStats = {
 	spam: 0,
 };
 
-const allFeedback = await db.select({ status: Feedback.status }).from(Feedback);
 allFeedback.forEach((item) => {
 	if (Object.hasOwn(statusStats, item.status)) {
 		statusStats[item.status]++;

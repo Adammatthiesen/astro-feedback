@@ -1,18 +1,6 @@
-import { AnalyticsEvents, and, db, desc, eq, Feedback, gte, sql, Websites } from 'astro:db';
+import { AnalyticsEvents, and, db, desc, eq, Feedback, gte, sql } from 'astro:db';
 import type { APIRoute } from 'astro';
-
-async function verifyApiKey(websiteId: number, apiKey: string) {
-	const website = await db
-		.select()
-		.from(Websites)
-		.where(and(eq(Websites.id, websiteId), eq(Websites.apiKey, apiKey)))
-		.get();
-
-	if (!website || !website.isActive) {
-		return null;
-	}
-	return website;
-}
+import { verifyApiKey } from '../../../lib/utils';
 
 export const GET: APIRoute = async ({ request, url }) => {
 	try {

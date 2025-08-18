@@ -44,34 +44,59 @@ const days = Number.parseInt(daysParam, 10);
 const startDate = new Date();
 startDate.setDate(startDate.getDate() - days);
 
-// Get basic stats
-const totalFeedback = await db
-	.select({ count: count() })
-	.from(Feedback)
-	.where(gte(Feedback.createdAt, startDate))
-	.get();
+const [
+	totalFeedbackEntries,
+	totalWebsitesEntries,
+	feedbackByStatus,
+	feedbackByType,
+	topWebsites,
+	recentEvents,
+] = await db.batch([
+	db.select({ count: count() }).from(Feedback).where(gte(Feedback.createdAt, startDate)),
+	db.select({ count: count() }).from(Websites),
+	db
+		.select({ status: Feedback.status, count: count() })
+		.from(Feedback)
+		.where(gte(Feedback.createdAt, startDate))
+		.groupBy(Feedback.status),
+	db
+		.select({
+			type: Feedback.type,
+			count: count(),
+		})
+		.from(Feedback)
+		.where(gte(Feedback.createdAt, startDate))
+		.groupBy(Feedback.type),
+	db
+		.select({
+			websiteId: Feedback.websiteId,
+			websiteName: Websites.name,
+			count: count(),
+		})
+		.from(Feedback)
+		.leftJoin(Websites, eq(Feedback.websiteId, Websites.id))
+		.where(gte(Feedback.createdAt, startDate))
+		.groupBy(Feedback.websiteId, Websites.name)
+		.orderBy(desc(count()))
+		.limit(10),
+	db
+		.select({
+			eventType: AnalyticsEvents.eventType,
+			websiteId: AnalyticsEvents.websiteId,
+			websiteName: Websites.name,
+			createdAt: AnalyticsEvents.createdAt,
+		})
+		.from(AnalyticsEvents)
+		.leftJoin(Websites, eq(AnalyticsEvents.websiteId, Websites.id))
+		.where(gte(AnalyticsEvents.createdAt, startDate))
+		.orderBy(desc(AnalyticsEvents.createdAt))
+		.limit(20),
+]);
 
-const totalWebsites = await db.select({ count: count() }).from(Websites).get();
-
-// Get feedback by status for the date range
-const feedbackByStatus = await db
-	.select({
-		status: Feedback.status,
-		count: count(),
-	})
-	.from(Feedback)
-	.where(gte(Feedback.createdAt, startDate))
-	.groupBy(Feedback.status);
-
-// Get feedback by type for the date range
-const feedbackByType = await db
-	.select({
-		type: Feedback.type,
-		count: count(),
-	})
-	.from(Feedback)
-	.where(gte(Feedback.createdAt, startDate))
-	.groupBy(Feedback.type);
+// Get total feedback count
+const totalFeedback = totalFeedbackEntries[0];
+// Get total websites count
+const totalWebsites = totalWebsitesEntries[0];
 
 // Get daily feedback counts for chart (last 30 days)
 const dailyFeedback: {
@@ -97,34 +122,6 @@ for (let i = days - 1; i >= 0; i--) {
 		count: dayCount?.count || 0,
 	});
 }
-
-// Get top websites by feedback count
-const topWebsites = await db
-	.select({
-		websiteId: Feedback.websiteId,
-		websiteName: Websites.name,
-		count: count(),
-	})
-	.from(Feedback)
-	.leftJoin(Websites, eq(Feedback.websiteId, Websites.id))
-	.where(gte(Feedback.createdAt, startDate))
-	.groupBy(Feedback.websiteId, Websites.name)
-	.orderBy(desc(count()))
-	.limit(10);
-
-// Get recent analytics events
-const recentEvents = await db
-	.select({
-		eventType: AnalyticsEvents.eventType,
-		websiteId: AnalyticsEvents.websiteId,
-		websiteName: Websites.name,
-		createdAt: AnalyticsEvents.createdAt,
-	})
-	.from(AnalyticsEvents)
-	.leftJoin(Websites, eq(AnalyticsEvents.websiteId, Websites.id))
-	.where(gte(AnalyticsEvents.createdAt, startDate))
-	.orderBy(desc(AnalyticsEvents.createdAt))
-	.limit(20);
 ---
 
 <AdminLayout title="Analytics - Admin Portal" currentAdmin={currentAdmin}>

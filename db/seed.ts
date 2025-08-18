@@ -1,5 +1,5 @@
 import { AdminUsers, db, Feedback, FeedbackCategories, Websites } from 'astro:db';
-import { generateWebsiteID, hashPassword } from '../src/lib/utils';
+import { generateApiKey, generateWebsiteID, hashPassword } from '../src/lib/utils';
 
 export default async function seed() {
 	console.log('🌱 Seeding database...');
@@ -11,7 +11,7 @@ export default async function seed() {
 			id: generateWebsiteID(),
 			name: 'My Sample Website',
 			domain: 'example.com',
-			apiKey: 'sample-api-key-123',
+			apiKey: generateApiKey(),
 			description: 'A sample website for testing the feedback API',
 			isActive: true,
 			settings: {

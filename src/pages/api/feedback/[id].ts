@@ -1,19 +1,7 @@
-import { and, db, eq, Feedback, FeedbackCategories, Websites } from 'astro:db';
+import { db, eq, Feedback, FeedbackCategories } from 'astro:db';
 import type { APIRoute } from 'astro';
 import { feedbackUpdateSchema } from '../../../lib/schemas';
-
-async function verifyApiKey(websiteId: number, apiKey: string) {
-	const website = await db
-		.select()
-		.from(Websites)
-		.where(and(eq(Websites.id, websiteId), eq(Websites.apiKey, apiKey)))
-		.get();
-
-	if (!website || !website.isActive) {
-		return null;
-	}
-	return website;
-}
+import { verifyApiKey } from '../../../lib/utils';
 
 export const GET: APIRoute = async ({ params, request }) => {
 	try {

@@ -39,44 +39,35 @@ if (!website) {
 	return Astro.redirect('/admin/websites');
 }
 
-// Get website statistics
-const feedbackStats = await db
-	.select({
-		total: count(),
-		status: Feedback.status,
-	})
-	.from(Feedback)
-	.where(eq(Feedback.websiteId, websiteId))
-	.groupBy(Feedback.status);
+const [feedbackStats, totalFeedbackEntries, recentFeedback, categories] = await db.batch([
+	db
+		.select({
+			total: count(),
+			status: Feedback.status,
+		})
+		.from(Feedback)
+		.where(eq(Feedback.websiteId, websiteId))
+		.groupBy(Feedback.status),
+	db.select({ count: count() }).from(Feedback).where(eq(Feedback.websiteId, websiteId)),
+	db
+		.select({
+			id: Feedback.id,
+			type: Feedback.type,
+			status: Feedback.status,
+			title: Feedback.title,
+			description: Feedback.description,
+			createdAt: Feedback.createdAt,
+			upvotes: Feedback.upvotes,
+			downvotes: Feedback.downvotes,
+		})
+		.from(Feedback)
+		.where(eq(Feedback.websiteId, websiteId))
+		.orderBy(desc(Feedback.createdAt))
+		.limit(10),
+	db.select().from(FeedbackCategories).where(eq(FeedbackCategories.websiteId, websiteId)),
+]);
 
-const totalFeedback = await db
-	.select({ count: count() })
-	.from(Feedback)
-	.where(eq(Feedback.websiteId, websiteId))
-	.get();
-
-// Get recent feedback for this website
-const recentFeedback = await db
-	.select({
-		id: Feedback.id,
-		type: Feedback.type,
-		status: Feedback.status,
-		title: Feedback.title,
-		description: Feedback.description,
-		createdAt: Feedback.createdAt,
-		upvotes: Feedback.upvotes,
-		downvotes: Feedback.downvotes,
-	})
-	.from(Feedback)
-	.where(eq(Feedback.websiteId, websiteId))
-	.orderBy(desc(Feedback.createdAt))
-	.limit(10);
-
-// Get categories for this website
-const categories = await db
-	.select()
-	.from(FeedbackCategories)
-	.where(eq(FeedbackCategories.websiteId, websiteId));
+const totalFeedback = totalFeedbackEntries[0];
 
 // Parse settings safely
 let settings: Website['settings'];

@@ -8,32 +8,10 @@ import {
 	Feedback,
 	FeedbackCategories,
 	sql,
-	Websites,
 } from 'astro:db';
 import type { APIRoute } from 'astro';
 import { feedbackQuerySchema, feedbackSubmissionSchema, type Website } from '../../../lib/schemas';
-
-// Utility function to verify API key and get website
-async function verifyApiKey(websiteId: number, apiKey: string) {
-	const website = await db
-		.select()
-		.from(Websites)
-		.where(and(eq(Websites.id, websiteId), eq(Websites.apiKey, apiKey)))
-		.get();
-
-	if (!website || !website.isActive) {
-		return null;
-	}
-	return website;
-}
-
-// Utility function to get client info
-function getClientInfo(request: Request) {
-	const ipAddress =
-		request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
-	const userAgent = request.headers.get('user-agent') || 'unknown';
-	return { ipAddress, userAgent };
-}
+import { getClientInfo, verifyApiKey } from '../../../lib/utils';
 
 export const POST: APIRoute = async ({ request }) => {
 	try {
