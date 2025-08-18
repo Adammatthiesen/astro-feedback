@@ -1,5 +1,6 @@
 ---
 import { AdminUsers, db, eq, Feedback, Websites } from 'astro:db';
+import Code from '../../components/Code.astro';
 import Layout from '../../layouts/Layout.astro';
 
 // Simple session check - in production, use proper session management
@@ -230,7 +231,7 @@ const stats = {
                                 <p class="tab-description">Copy this HTML form code to add a feedback form to your website:</p>
                                 <div class="code-block">
                                     <button class="copy-code-btn" onclick="copyCode('html-code')">📋 Copy</button>
-                                    <pre><code id="html-code"><!-- Select a website to generate code --></code></pre>
+                                    <Code id="html-code" code="<!-- Select a website to generate code -->" />
                                 </div>
                             </div>
 
@@ -240,7 +241,7 @@ const stats = {
                                 <p class="tab-description">Use this JavaScript code to submit feedback programmatically:</p>
                                 <div class="code-block">
                                     <button class="copy-code-btn" onclick="copyCode('js-code')">📋 Copy</button>
-                                    <pre><code id="js-code">// Select a website to generate code</code></pre>
+                                    <Code id="js-code" code="// Select a website to generate code" />
                                 </div>
                             </div>
 
@@ -250,7 +251,7 @@ const stats = {
                                 <p class="tab-description">Test the API directly with cURL commands:</p>
                                 <div class="code-block">
                                     <button class="copy-code-btn" onclick="copyCode('curl-code')">📋 Copy</button>
-                                    <pre><code id="curl-code"># Select a website to generate code</code></pre>
+                                    <Code id="curl-code" code="# Select a website to generate code" />
                                 </div>
                             </div>
 
@@ -260,7 +261,7 @@ const stats = {
                                 <p class="tab-description">Add a floating feedback widget to your website:</p>
                                 <div class="code-block">
                                     <button class="copy-code-btn" onclick="copyCode('widget-code')">📋 Copy</button>
-                                    <pre><code id="widget-code"><!-- Select a website to generate code --></code></pre>
+                                    <Code id="widget-code" code="<!-- Select a website to generate code -->" />
                                 </div>
                             </div>
                         </div>
@@ -353,6 +354,7 @@ const stats = {
     // Modal functionality
     function showCodeGenerator() {
         document.getElementById('code-generator-modal').style.display = 'flex';
+        updateCodeSamples();
     }
 
     function showApiDocs() {
@@ -475,7 +477,16 @@ const feedbackAPI = {
     apiKey: '${apiKey}',
     websiteId: ${websiteId},
 
-    async submitFeedback(feedbackData) {
+    async submitFeedback(feedbackData: {
+        categoryId?: number;
+        type: 'bug' | 'feature' | 'improvement' | 'question' | 'compliment' | 'complaint' | 'other';
+        title: string;
+        description: string;
+        email?: string;
+        name?: string;
+        url?: string;
+        metadata?: Record<string, any>;
+    }) {
         try {
             const response = await fetch(\`\${this.baseUrl}/feedback\`, {
                 method: 'POST',

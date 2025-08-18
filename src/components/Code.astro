@@ -1,0 +1,25 @@
+---
+import './code.css';
+
+interface Props {
+	code: string;
+	ins?: string;
+	del?: string;
+	id?: string;
+}
+
+const { id, code, del, ins } = Astro.props;
+
+const htmlCode = code.split('\n').map((line) => `<span class="line">${line}</span>\n`);
+
+const props: Record<string, string> = {};
+
+if (del) {
+	props['data-lines-deleted'] = del;
+}
+
+if (ins) {
+	props['data-lines-inserted'] = ins;
+}
+---
+<pre class="code-container scrollbar"><code id={id} class="custom-code" class:list={[(del || ins) && 'diff']} {...props} set:html={htmlCode}></code></pre>

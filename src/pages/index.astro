@@ -1,5 +1,6 @@
 ---
 import { FeedbackCategories, Websites } from 'astro:db';
+import Code from '../components/Code.astro';
 import Layout from '../layouts/Layout.astro';
 
 const sampleWebsite: typeof Websites.$inferSelect = {
@@ -188,19 +189,19 @@ function buildSnippetVote(sampleWebsite: typeof Websites.$inferSelect) {
             <!-- Submit Feedback -->
             <div>
               <h3 class="font-medium mb-2">Submit Feedback</h3>
-              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>{buildSnippetSubmit(sampleWebsite)}</code></pre>
+              <Code code={buildSnippetSubmit(sampleWebsite)} />
             </div>
 
             <!-- Get Feedback -->
             <div>
               <h3 class="font-medium mb-2">Get Feedback</h3>
-              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>{buildSnippetGet(sampleWebsite)}</code></pre>
+              <Code code={buildSnippetGet(sampleWebsite)} />
             </div>
 
             <!-- Vote on Feedback -->
             <div>
               <h3 class="font-medium mb-2">Vote on Feedback</h3>
-              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>{buildSnippetVote(sampleWebsite)}</code></pre>
+              <Code code={buildSnippetVote(sampleWebsite)} />
             </div>
           </div>
         </section>
