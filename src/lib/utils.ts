@@ -1,4 +1,5 @@
 import {
+	AdminUsers,
 	AnalyticsEvents,
 	and,
 	db,
@@ -9,6 +10,7 @@ import {
 	Websites,
 } from 'astro:db';
 import crypto from 'node:crypto';
+import type { AstroGlobal } from 'astro';
 
 export function generateWebsiteID(): number {
 	// Generate a random 8-digit number
@@ -283,4 +285,30 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 	const { hashedPassword: storedHash, salt } = parseHashedPassword(hashedPassword);
 	const hash = await scryptHash(password, salt);
 	return hash === storedHash;
+}
+
+export async function verifySession(Astro: AstroGlobal) {
+	let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
+
+	const sessionCookie = Astro.cookies.get('admin-session');
+
+	if (sessionCookie) {
+		try {
+			const sessionData = JSON.parse(sessionCookie.value);
+			const adminResult = await db
+				.select()
+				.from(AdminUsers)
+				.where(eq(AdminUsers.id, sessionData.adminId));
+
+			if (!currentAdmin || !currentAdmin.isActive) {
+				currentAdmin = undefined;
+				Astro.cookies.delete('admin-session');
+			}
+			currentAdmin = adminResult[0];
+		} catch (_error) {
+			Astro.cookies.delete('admin-session');
+		}
+	}
+
+	return currentAdmin;
 }

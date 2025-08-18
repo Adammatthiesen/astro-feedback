@@ -1,28 +1,13 @@
 ---
-import { AdminUsers, count, db, desc, eq, Feedback, FeedbackCategories, Websites } from 'astro:db';
+import { count, db, desc, eq, Feedback, FeedbackCategories, Websites } from 'astro:db';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import type { Website } from '../../../../lib/schemas';
+import { verifySession } from '../../../../lib/utils';
 
-// Check admin authentication
-const sessionCookie = Astro.cookies.get('admin-session');
-let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
+const currentAdmin = await verifySession(Astro);
 
-if (sessionCookie) {
-	try {
-		const sessionData = JSON.parse(sessionCookie.value);
-		currentAdmin = await db
-			.select()
-			.from(AdminUsers)
-			.where(eq(AdminUsers.id, sessionData.adminId))
-			.get();
-
-		if (!currentAdmin || !currentAdmin.isActive) {
-			return Astro.redirect('/admin/login');
-		}
-	} catch (error) {
-		return Astro.redirect('/admin/login');
-	}
-} else {
+// If not logged in, redirect to login
+if (!currentAdmin) {
 	return Astro.redirect('/admin/login');
 }
 

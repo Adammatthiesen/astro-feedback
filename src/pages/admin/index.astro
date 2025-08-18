@@ -1,29 +1,10 @@
 ---
-import { AdminUsers, db, eq, Feedback, Websites } from 'astro:db';
+import { db, Feedback, Websites } from 'astro:db';
 import Code from '../../components/Code.astro';
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import { verifySession } from '../../lib/utils';
 
-// Simple session check - in production, use proper session management
-const sessionCookie = Astro.cookies.get('admin-session');
-let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
-
-if (sessionCookie) {
-	try {
-		const sessionData = JSON.parse(sessionCookie.value);
-		const adminResult = await db
-			.select()
-			.from(AdminUsers)
-			.where(eq(AdminUsers.id, sessionData.adminId));
-
-		if (!currentAdmin || !currentAdmin.isActive) {
-			currentAdmin = undefined;
-			Astro.cookies.delete('admin-session');
-		}
-		currentAdmin = adminResult[0];
-	} catch (error) {
-		Astro.cookies.delete('admin-session');
-	}
-}
+const currentAdmin = await verifySession(Astro);
 
 // If not logged in, redirect to login
 if (!currentAdmin) {
