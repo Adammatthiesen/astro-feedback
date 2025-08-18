@@ -317,14 +317,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Planned Feature
 - [ ] Email notification system
-- [ ] Webhook support for external integrations
 - [ ] Advanced reporting and exports
-- [ ] Multi-language support
-- [ ] Theme customization system
-- [ ] Mobile-responsive admin interface improvements
-- [ ] Advanced user roles and permissions
 - [ ] API rate limiting dashboard
+- [ ] Mobile-responsive admin interface improvements
+- [ ] Theme customization system
+- [ ] Webhook support for external integrations
 - [ ] Automated spam detection
+- [ ] Advanced user roles and permissions
+- [ ] Multi-language support
 - [ ] Convert into an integration?
 
 ---
