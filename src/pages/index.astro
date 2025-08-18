@@ -251,30 +251,6 @@ function buildSnippetVote(sampleWebsite: typeof Websites.$inferSelect) {
     }
   }
 
-  // // Vote on feedback
-  // window.vote = async function(feedbackId, voteType) {
-  //   try {
-  //     const response = await fetch(`${baseUrl}/api/feedback/${feedbackId}/vote`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'x-api-key': apiKey
-  //       },
-  //       body: JSON.stringify({ voteType })
-  //     });
-
-  //     const result = await response.json();
-      
-  //     if (result.success) {
-  //       loadFeedback(); // Refresh to show updated vote counts
-  //     } else {
-  //       alert('Error voting: ' + result.error);
-  //     }
-  //   } catch (error) {
-  //     alert('Error voting: ' + error.message);
-  //   }
-  // };
-
   // Refresh button
   const refreshButton = document.getElementById('refresh-feedback');
   if (refreshButton) {
