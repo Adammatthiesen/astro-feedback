@@ -84,7 +84,7 @@ if (Astro.request.method === 'POST') {
 			}
 		}
 	} catch (err) {
-		error = 'Failed to create website: ' + (err as Error).message;
+		error = `Failed to create website: ${(err as Error).message}`;
 	}
 }
 ---

@@ -159,7 +159,7 @@ export const DELETE: APIRoute = async ({ params, cookies }) => {
 		}
 
 		// Get website ID from params
-		const websiteId = Number.parseInt(params.id as string);
+		const websiteId = Number.parseInt(params.id as string, 10);
 		if (Number.isNaN(websiteId)) {
 			return new Response(JSON.stringify({ error: 'Invalid website ID' }), {
 				status: 400,

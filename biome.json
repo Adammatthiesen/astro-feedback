@@ -1,82 +1,76 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
-	"vcs": {
-		"enabled": true,
-		"clientKind": "git",
-		"useIgnoreFile": true,
-		"defaultBranch": "main"
-	},
-	"files": {
-		"ignoreUnknown": true,
-		"includes": [
-			"**",
-			"!**/*.min.js",
-			"!**/*.min.css"
-		]
-	},
-	"formatter": {
-		"lineWidth": 100,
-		"lineEnding": "lf"
-	},
-	"javascript": {
-		"formatter": {
-			"quoteStyle": "single",
-			"trailingCommas": "es5"
-		}
-	},
-	"json": {
-		"formatter": {
-			"indentStyle": "space"
-		}
-	},
-	"assist": {
-		"actions": {
-			"source": {
-				"organizeImports": "on"
-			}
-		}
-	},
-	"linter": {
-		"enabled": true,
-		"rules": {
-			"recommended": true,
-			"suspicious": {
-				"noExplicitAny": "warn"
-			},
-			"performance": {
-				"noDynamicNamespaceImportAccess": "off"
-			},
-			"style": {
-				"noParameterAssign": "off",
-				"useAsConstAssertion": "error",
-				"useDefaultParameterLast": "error",
-				"useEnumInitializers": "error",
-				"useSelfClosingElements": "error",
-				"useSingleVarDeclarator": "error",
-				"noUnusedTemplateLiteral": "error",
-				"useNumberNamespace": "error",
-				"noInferrableTypes": "error",
-				"noUselessElse": "error"
-			}
-		}
-	},
-	"overrides": [
-		{
-			"includes": [
-				"**/*.astro"
-			],
-			"linter": {
-				"rules": {
-					"correctness": {
-						"noUnusedImports": "off",
-						"noUnusedVariables": "off"
-					},
-					"style": {
-						"useConst": "off",
-						"useImportType": "off"
-					}
-				}
-			}
-		}
-	]
+  "$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": ["**", "!**/*.min.js", "!**/*.min.css"]
+  },
+  "formatter": {
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "es5"
+    }
+  },
+  "json": {
+    "formatter": {
+      "indentStyle": "space"
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noExplicitAny": "warn"
+      },
+      "performance": {
+        "noDynamicNamespaceImportAccess": "off"
+      },
+      "style": {
+        "noParameterAssign": "off",
+        "useAsConstAssertion": "error",
+        "useDefaultParameterLast": "error",
+        "useEnumInitializers": "error",
+        "useSelfClosingElements": "error",
+        "useSingleVarDeclarator": "error",
+        "noUnusedTemplateLiteral": "error",
+        "useNumberNamespace": "error",
+        "noInferrableTypes": "error",
+        "noUselessElse": "error"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.astro"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "off",
+            "noUnusedVariables": "off"
+          },
+          "style": {
+            "useConst": "off",
+            "useImportType": "off"
+          }
+        }
+      }
+    }
+  ]
 }
