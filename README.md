@@ -315,11 +315,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Webhook support for external integrations
 - [ ] Advanced reporting and exports
 - [ ] Multi-language support
-- [ ] Theme customization
+- [ ] Theme customization system
 - [ ] Mobile-responsive admin interface improvements
 - [ ] Advanced user roles and permissions
 - [ ] API rate limiting dashboard
 - [ ] Automated spam detection
+- [ ] Convert into an integration?
 
 ---
 
