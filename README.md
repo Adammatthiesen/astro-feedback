@@ -308,16 +308,9 @@ db/
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
-
-For support, please:
-1. Check the [documentation](docs/)
-2. Search existing [issues](../../issues)
-3. Create a new issue with detailed information
-
 ## 🗺️ Roadmap
 
-### Planned Features
+### Planned Feature
 - [ ] Email notification system
 - [ ] Webhook support for external integrations
 - [ ] Advanced reporting and exports
@@ -327,7 +320,6 @@ For support, please:
 - [ ] Advanced user roles and permissions
 - [ ] API rate limiting dashboard
 - [ ] Automated spam detection
-- [ ] Integration with popular help desk systems
 
 ---
 
