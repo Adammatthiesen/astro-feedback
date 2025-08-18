@@ -9,16 +9,16 @@ let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
 if (sessionCookie) {
 	try {
 		const sessionData = JSON.parse(sessionCookie.value);
-		currentAdmin = await db
+		const adminResult = await db
 			.select()
 			.from(AdminUsers)
-			.where(eq(AdminUsers.id, sessionData.adminId))
-			.get();
+			.where(eq(AdminUsers.id, sessionData.adminId));
 
 		if (!currentAdmin || !currentAdmin.isActive) {
 			currentAdmin = undefined;
 			Astro.cookies.delete('admin-session');
 		}
+		currentAdmin = adminResult[0];
 	} catch (error) {
 		Astro.cookies.delete('admin-session');
 	}
@@ -29,29 +29,39 @@ if (!currentAdmin) {
 	return Astro.redirect('/admin/login');
 }
 
+// Get statistics
+const dbResults = await Promise.all([
+	db.select().from(Websites),
+	db.select().from(Feedback),
+	db.select().from(AdminUsers),
+]);
+
+const websites = dbResults[0];
+const feedback = dbResults[1];
+const admins = dbResults[2];
+
+// Get recent feedback
+const recentFeedback = await db
+	.select({
+		id: Feedback.id,
+		title: Feedback.title,
+		type: Feedback.type,
+		status: Feedback.status,
+		createdAt: Feedback.createdAt,
+		websiteName: Websites.name,
+	})
+	.from(Feedback)
+	.innerJoin(Websites, eq(Feedback.websiteId, Websites.id))
+	.orderBy(Feedback.createdAt)
+	.limit(5);
+
 // Get dashboard stats
 const stats = {
-	totalWebsites: 0,
-	totalFeedback: 0,
-	pendingFeedback: 0,
-	resolvedFeedback: 0,
+	totalWebsites: websites.length || 0,
+	totalFeedback: feedback.length || 0,
+	pendingFeedback: feedback.filter((f) => f.status === 'new').length || 0,
+	resolvedFeedback: feedback.filter((f) => f.status === 'resolved').length || 0,
 };
-
-try {
-	const websiteCount = await db.select().from(Websites);
-	stats.totalWebsites = websiteCount.length;
-
-	const feedbackCount = await db.select().from(Feedback);
-	stats.totalFeedback = feedbackCount.length;
-
-	const pendingCount = await db.select().from(Feedback).where(eq(Feedback.status, 'new'));
-	stats.pendingFeedback = pendingCount.length;
-
-	const resolvedCount = await db.select().from(Feedback).where(eq(Feedback.status, 'resolved'));
-	stats.resolvedFeedback = resolvedCount.length;
-} catch (error) {
-	console.error('Error fetching dashboard stats:', error);
-}
 ---
 
 <Layout title="Admin Dashboard - Feedback API">
@@ -158,12 +168,559 @@ try {
                             <h4>View Analytics</h4>
                             <p>See feedback trends and insights</p>
                         </a>
+
+                        <button 
+                            onclick="showCodeGenerator()" 
+                            class="action-card action-button"
+                        >
+                            <div class="action-icon">💻</div>
+                            <h4>Generate Code</h4>
+                            <p>Get integration code for your website</p>
+                        </button>
+
+                        <button 
+                            onclick="showApiDocs()" 
+                            class="action-card action-button"
+                        >
+                            <div class="action-icon">📖</div>
+                            <h4>API Documentation</h4>
+                            <p>View API endpoints and examples</p>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Code Generator Modal -->
+                <div id="code-generator-modal" class="modal">
+                    <div class="modal-content large-modal">
+                        <div class="modal-header">
+                            <h3>Integration Code Generator</h3>
+                            <button onclick="closeModal('code-generator-modal')" class="modal-close">×</button>
+                        </div>
+                        
+                        <div class="modal-body">
+                            <!-- Website Selection -->
+                            <div class="form-section">
+                                <h4>Select Website</h4>
+                                <select id="website-selector" onchange="updateCodeSamples()">
+                                    <option value="">Choose a website...</option>
+                                    {websites.map(website => (
+                                        <option 
+                                            value={website.id}
+                                            data-domain={website.domain}
+                                            data-api-key={website.apiKey}
+                                            data-name={website.name}
+                                        >
+                                            {website.name} ({website.domain})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <!-- Code Tabs -->
+                            <div class="code-tabs">
+                                <button class="tab-button active" onclick="showTab('html-form')">HTML Form</button>
+                                <button class="tab-button" onclick="showTab('javascript')">JavaScript</button>
+                                <button class="tab-button" onclick="showTab('curl')">cURL</button>
+                                <button class="tab-button" onclick="showTab('widget')">Widget</button>
+                            </div>
+
+                            <!-- HTML Form Tab -->
+                            <div id="html-form" class="tab-content active">
+                                <h4>HTML Feedback Form</h4>
+                                <p class="tab-description">Copy this HTML form code to add a feedback form to your website:</p>
+                                <div class="code-block">
+                                    <button class="copy-code-btn" onclick="copyCode('html-code')">📋 Copy</button>
+                                    <pre><code id="html-code"><!-- Select a website to generate code --></code></pre>
+                                </div>
+                            </div>
+
+                            <!-- JavaScript Tab -->
+                            <div id="javascript" class="tab-content">
+                                <h4>JavaScript Integration</h4>
+                                <p class="tab-description">Use this JavaScript code to submit feedback programmatically:</p>
+                                <div class="code-block">
+                                    <button class="copy-code-btn" onclick="copyCode('js-code')">📋 Copy</button>
+                                    <pre><code id="js-code">// Select a website to generate code</code></pre>
+                                </div>
+                            </div>
+
+                            <!-- cURL Tab -->
+                            <div id="curl" class="tab-content">
+                                <h4>cURL Example</h4>
+                                <p class="tab-description">Test the API directly with cURL commands:</p>
+                                <div class="code-block">
+                                    <button class="copy-code-btn" onclick="copyCode('curl-code')">📋 Copy</button>
+                                    <pre><code id="curl-code"># Select a website to generate code</code></pre>
+                                </div>
+                            </div>
+
+                            <!-- Widget Tab -->
+                            <div id="widget" class="tab-content">
+                                <h4>Feedback Widget</h4>
+                                <p class="tab-description">Add a floating feedback widget to your website:</p>
+                                <div class="code-block">
+                                    <button class="copy-code-btn" onclick="copyCode('widget-code')">📋 Copy</button>
+                                    <pre><code id="widget-code"><!-- Select a website to generate code --></code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Documentation Modal -->
+                <div id="api-docs-modal" class="modal">
+                    <div class="modal-content large-modal">
+                        <div class="modal-header">
+                            <h3>API Documentation</h3>
+                            <button onclick="closeModal('api-docs-modal')" class="modal-close">×</button>
+                        </div>
+                        
+                        <div class="modal-body">
+                            <div class="api-docs">
+                                <div class="api-section">
+                                    <h4>🔐 Authentication</h4>
+                                    <p>All API requests require an API key in the <code>x-api-key</code> header.</p>
+                                    <div class="api-example">
+                                        <strong>Header:</strong><br>
+                                        <code>x-api-key: your-website-api-key</code>
+                                    </div>
+                                </div>
+
+                                <div class="api-section">
+                                    <h4>📝 Submit Feedback</h4>
+                                    <p><strong>POST</strong> <code>/api/feedback</code></p>
+                                    <div class="api-example">
+                                        <strong>Required fields:</strong><br>
+                                        • <code>websiteId</code> (number)<br>
+                                        • <code>type</code> (bug|feature|improvement|question|compliment|complaint|other)<br>
+                                        • <code>title</code> (string)<br>
+                                        • <code>description</code> (string)
+                                    </div>
+                                    <div class="api-example">
+                                        <strong>Optional fields:</strong><br>
+                                        • <code>categoryId</code> (number)<br>
+                                        • <code>email</code> (string)<br>
+                                        • <code>name</code> (string)<br>
+                                        • <code>url</code> (string)
+                                    </div>
+                                </div>
+
+                                <div class="api-section">
+                                    <h4>📋 Get Feedback</h4>
+                                    <p><strong>GET</strong> <code>/api/feedback</code></p>
+                                    <div class="api-example">
+                                        <strong>Query parameters:</strong><br>
+                                        • <code>websiteId</code> (required)<br>
+                                        • <code>limit</code> (optional, default: 10)<br>
+                                        • <code>offset</code> (optional, default: 0)<br>
+                                        • <code>status</code> (optional)<br>
+                                        • <code>type</code> (optional)
+                                    </div>
+                                </div>
+
+                                <div class="api-section">
+                                    <h4>👍 Vote on Feedback</h4>
+                                    <p><strong>POST</strong> <code>/api/feedback/&#123;id&#125;/vote</code></p>
+                                    <div class="api-example">
+                                        <strong>Body:</strong><br>
+                                        <code>&#123; "voteType": "up" | "down" &#125;</code>
+                                    </div>
+                                </div>
+
+                                <div class="api-section">
+                                    <h4>💬 Add Comment</h4>
+                                    <p><strong>POST</strong> <code>/api/feedback/&#123;id&#125;/comments</code></p>
+                                    <div class="api-example">
+                                        <strong>Body:</strong><br>
+                                        <code>&#123; "content": "string", "authorName": "string", "authorEmail": "string" &#125;</code>
+                                    </div>
+                                </div>
+
+                                <div class="api-section">
+                                    <h4>📊 Get Categories</h4>
+                                    <p><strong>GET</strong> <code>/api/categories?websiteId=&#123;id&#125;</code></p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 </Layout>
+
+<script is:inline>
+    // Modal functionality
+    function showCodeGenerator() {
+        document.getElementById('code-generator-modal').style.display = 'flex';
+    }
+
+    function showApiDocs() {
+        document.getElementById('api-docs-modal').style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+
+    // Tab functionality
+    function showTab(tabId, event) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        // Show selected tab
+        document.getElementById(tabId).classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    // Code generation
+    function updateCodeSamples() {
+        const selector = document.getElementById('website-selector');
+        const selectedOption = selector.options[selector.selectedIndex];
+        
+        if (!selectedOption.value) {
+            // Reset all code blocks
+            document.getElementById('html-code').textContent = '<!-- Select a website to generate code -->';
+            document.getElementById('js-code').textContent = '// Select a website to generate code';
+            document.getElementById('curl-code').textContent = '# Select a website to generate code';
+            document.getElementById('widget-code').textContent = '<!-- Select a website to generate code -->';
+            return;
+        }
+
+        const websiteId = selectedOption.value;
+        const domain = selectedOption.getAttribute('data-domain');
+        const apiKey = selectedOption.getAttribute('data-api-key');
+        const websiteName = selectedOption.getAttribute('data-name');
+        const baseUrl = window.location.origin;
+
+			// Generate HTML Form code
+			const htmlCode = `<!-- Feedback Form for ${websiteName} -->
+<form id="feedback-form" action="${baseUrl}/api/feedback" method="POST">
+    <input type="hidden" name="websiteId" value="${websiteId}">
+    
+    <div class="form-group">
+        <label for="type">Feedback Type:</label>
+        <select name="type" id="type" required>
+            <option value="bug">Bug Report</option>
+            <option value="feature">Feature Request</option>
+            <option value="improvement">Improvement</option>
+            <option value="question">Question</option>
+            <option value="compliment">Compliment</option>
+            <option value="complaint">Complaint</option>
+            <option value="other">Other</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="title">Title:</label>
+        <input type="text" name="title" id="title" required>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description:</label>
+        <textarea name="description" id="description" required></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="email">Email (optional):</label>
+        <input type="email" name="email" id="email">
+    </div>
+
+    <div class="form-group">
+        <label for="name">Name (optional):</label>
+        <input type="text" name="name" id="name">
+    </div>
+
+    <button type="submit">Submit Feedback</button>
+</form>
+
+<script>
+document.getElementById('feedback-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    
+    try {
+        const response = await fetch('${baseUrl}/api/feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': '${apiKey}'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            alert('Feedback submitted successfully!');
+            this.reset();
+        } else {
+            alert('Error submitting feedback');
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+});
+<\/script>`;
+
+			// Generate JavaScript code
+			const jsCode = `// Feedback API Client for ${websiteName}
+const feedbackAPI = {
+    baseUrl: '${baseUrl}/api',
+    apiKey: '${apiKey}',
+    websiteId: ${websiteId},
+
+    async submitFeedback(feedbackData) {
+        try {
+            const response = await fetch(\`\${this.baseUrl}/feedback\`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': this.apiKey
+                },
+                body: JSON.stringify({
+                    websiteId: this.websiteId,
+                    ...feedbackData
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(\`HTTP error! status: \${response.status}\`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error submitting feedback:', error);
+            throw error;
+        }
+    }
+};
+
+// Example usage:
+feedbackAPI.submitFeedback({
+    type: 'bug',
+    title: 'Login issue',
+    description: 'Cannot login with email',
+    email: 'user@example.com'
+});`;
+
+			// Generate cURL code
+			const curlCode = `# Submit Feedback to ${websiteName}
+curl -X POST ${baseUrl}/api/feedback \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: ${apiKey}" \\
+  -d '{
+    "websiteId": ${websiteId},
+    "type": "bug",
+    "title": "Example feedback",
+    "description": "This is an example feedback submission",
+    "email": "user@example.com",
+    "name": "John Doe"
+  }'
+
+# Get Feedback
+curl "${baseUrl}/api/feedback?websiteId=${websiteId}&limit=10" \\
+  -H "x-api-key: ${apiKey}"`;
+
+			// Generate Widget code
+			const widgetCode = `<!-- Floating Feedback Widget for ${websiteName} -->
+<div id="feedback-widget">
+    <button id="feedback-trigger" class="feedback-button">
+        💬 Feedback
+    </button>
+    
+    <div id="feedback-modal" class="feedback-modal hidden">
+        <div class="feedback-modal-content">
+            <div class="feedback-header">
+                <h3>Send Feedback</h3>
+                <button id="close-feedback" class="close-button">×</button>
+            </div>
+            
+            <form id="widget-feedback-form">
+                <select name="type" required>
+                    <option value="">Select type...</option>
+                    <option value="bug">Bug Report</option>
+                    <option value="feature">Feature Request</option>
+                    <option value="improvement">Improvement</option>
+                    <option value="question">Question</option>
+                    <option value="compliment">Compliment</option>
+                    <option value="complaint">Complaint</option>
+                    <option value="other">Other</option>
+                </select>
+                
+                <input type="text" name="title" placeholder="Title" required>
+                <textarea name="description" placeholder="Description" required></textarea>
+                <input type="email" name="email" placeholder="Email (optional)">
+                <input type="text" name="name" placeholder="Name (optional)">
+                
+                <button type="submit">Send Feedback</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.feedback-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.feedback-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+}
+
+.feedback-modal.hidden {
+    display: none;
+}
+
+.feedback-modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+}
+
+#widget-feedback-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#widget-feedback-form input,
+#widget-feedback-form select,
+#widget-feedback-form textarea {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#widget-feedback-form button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+</style>
+
+<script>
+(function() {
+    const trigger = document.getElementById('feedback-trigger');
+    const modal = document.getElementById('feedback-modal');
+    const closeBtn = document.getElementById('close-feedback');
+    const form = document.getElementById('widget-feedback-form');
+
+    trigger.addEventListener('click', () => {
+        modal.classList.remove('hidden');
+    });
+
+    closeBtn.addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        data.websiteId = ${websiteId};
+
+        try {
+            const response = await fetch('${baseUrl}/api/feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': '${apiKey}'
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                alert('Feedback submitted successfully!');
+                form.reset();
+                modal.classList.add('hidden');
+            } else {
+                alert('Error submitting feedback');
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    });
+})();
+<\/script>`;
+
+        // Update code blocks
+        document.getElementById('html-code').textContent = htmlCode;
+        document.getElementById('js-code').textContent = jsCode;
+        document.getElementById('curl-code').textContent = curlCode;
+        document.getElementById('widget-code').textContent = widgetCode;
+    }
+
+    // Copy code functionality
+    function copyCode(codeId) {
+        const codeElement = document.getElementById(codeId);
+        const text = codeElement.textContent;
+        
+        navigator.clipboard.writeText(text).then(function() {
+            const button = codeElement.parentElement.querySelector('.copy-code-btn');
+            const originalText = button.textContent;
+            button.textContent = '✅ Copied!';
+            button.style.background = '#10b981';
+            
+            setTimeout(function() {
+                button.textContent = originalText;
+                button.style.background = '';
+            }, 2000);
+        }).catch(function(err) {
+            console.error('Failed to copy: ', err);
+            alert('Failed to copy code to clipboard');
+        });
+    }
+
+    // Close modals when clicking outside
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.modal').forEach(function(modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+    });
+
+    // Make functions globally available
+    window.showCodeGenerator = showCodeGenerator;
+    window.showApiDocs = showApiDocs;
+    window.closeModal = closeModal;
+    window.showTab = showTab;
+    window.updateCodeSamples = updateCodeSamples;
+    window.copyCode = copyCode;
+</script>
 
 <style>
     .admin-layout {
@@ -264,7 +821,20 @@ try {
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
-    .action-card:hover {
+    .action-button {
+        background: white;
+        border: 1px solid #e5e7eb;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        font-weight: 500;
+        text-align: center;
+        display: block;
+        width: 100%;
+    }
+
+    .action-card:hover,
+    .action-button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         border-color: #2563eb;
@@ -303,5 +873,236 @@ try {
             flex-direction: column;
             text-align: center;
         }
+    }
+
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 0;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 90vh;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        background: #f8f9fa;
+        padding: 20px 30px;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        color: #2c3e50;
+        font-size: 1.5rem;
+    }
+
+    .close-btn {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #6c757d;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .close-btn:hover {
+        color: #495057;
+    }
+
+    .modal-body {
+        padding: 30px;
+        overflow-y: auto;
+        max-height: calc(90vh - 120px);
+    }
+
+    /* Tab Styles */
+    .tabs {
+        border-bottom: 1px solid #dee2e6;
+        margin-bottom: 20px;
+    }
+
+    .tab-button {
+        background: none;
+        border: none;
+        padding: 12px 20px;
+        cursor: pointer;
+        color: #6c757d;
+        font-size: 1rem;
+        border-bottom: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+
+    .tab-button:hover {
+        color: #495057;
+        background: #f8f9fa;
+    }
+
+    .tab-button.active {
+        color: #3498db;
+        border-bottom-color: #3498db;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Code Block Styles */
+    .code-block {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    .code-header {
+        background: #e9ecef;
+        padding: 10px 15px;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .code-language {
+        font-weight: 500;
+        color: #495057;
+        font-size: 0.9rem;
+    }
+
+    .copy-code-btn {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: background 0.3s ease;
+    }
+
+    .copy-code-btn:hover {
+        background: #495057;
+    }
+
+    .code-content {
+        padding: 15px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        color: #495057;
+        overflow-x: auto;
+    }
+
+    /* Form Styles */
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-size: 1rem;
+        background: white;
+    }
+
+    .form-group select:focus {
+        outline: none;
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+
+    /* API Documentation Styles */
+    .api-section {
+        margin-bottom: 30px;
+    }
+
+    .api-section h4 {
+        color: #2c3e50;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .endpoint {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        border-left: 4px solid #3498db;
+    }
+
+    .endpoint-method {
+        display: inline-block;
+        background: #3498db;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        margin-right: 10px;
+    }
+
+    .endpoint-method.post {
+        background: #2ecc71;
+    }
+
+    .endpoint-method.put {
+        background: #f39c12;
+    }
+
+    .endpoint-method.delete {
+        background: #e74c3c;
+    }
+
+    .endpoint-url {
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.9rem;
+        color: #495057;
+    }
+
+    .endpoint-description {
+        margin-top: 10px;
+        color: #6c757d;
+        font-size: 0.9rem;
     }
 </style>
