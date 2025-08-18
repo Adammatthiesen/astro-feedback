@@ -1,4 +1,4 @@
-import { db, eq, Websites } from 'astro:db';
+import { AdminUsers, db, eq, Websites } from 'astro:db';
 import crypto from 'node:crypto';
 import type { APIRoute } from 'astro';
 import { websiteSchema } from '../../../lib/schemas';
@@ -9,8 +9,38 @@ function generateApiKey(): string {
 	return crypto.randomBytes(32).toString('hex');
 }
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, cookies }) => {
 	try {
+		// Check admin authentication
+		const sessionCookie = cookies.get('admin-session');
+		if (!sessionCookie) {
+			return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+				status: 401,
+				headers: { 'Content-Type': 'application/json' },
+			});
+		}
+
+		let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
+		try {
+			const sessionData = JSON.parse(sessionCookie.value);
+			currentAdmin = await db
+				.select()
+				.from(AdminUsers)
+				.where(eq(AdminUsers.id, sessionData.adminId))
+				.get();
+
+			if (!currentAdmin || !currentAdmin.isActive) {
+				return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+					status: 401,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+		} catch (_error) {
+			return new Response(JSON.stringify({ error: 'Invalid session' }), {
+				status: 401,
+				headers: { 'Content-Type': 'application/json' },
+			});
+		}
 		const body = await request.json();
 
 		// Validate request body
@@ -94,13 +124,34 @@ export const POST: APIRoute = async ({ request }) => {
 	}
 };
 
-export const GET: APIRoute = async ({ request }) => {
+export const GET: APIRoute = async ({ cookies }) => {
 	try {
-		const adminKey = request.headers.get('x-admin-key');
+		// Check admin authentication
+		const sessionCookie = cookies.get('admin-session');
+		if (!sessionCookie) {
+			return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+				status: 401,
+				headers: { 'Content-Type': 'application/json' },
+			});
+		}
 
-		// Basic admin authentication - you should implement proper admin auth
-		if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
-			return new Response(JSON.stringify({ error: 'Admin access required' }), {
+		let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
+		try {
+			const sessionData = JSON.parse(sessionCookie.value);
+			currentAdmin = await db
+				.select()
+				.from(AdminUsers)
+				.where(eq(AdminUsers.id, sessionData.adminId))
+				.get();
+
+			if (!currentAdmin || !currentAdmin.isActive) {
+				return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+					status: 401,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+		} catch (_error) {
+			return new Response(JSON.stringify({ error: 'Invalid session' }), {
 				status: 401,
 				headers: { 'Content-Type': 'application/json' },
 			});
