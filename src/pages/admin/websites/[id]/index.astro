@@ -1,6 +1,6 @@
 ---
 import { AdminUsers, count, db, desc, eq, Feedback, FeedbackCategories, Websites } from 'astro:db';
-import Layout from '../../../../layouts/Layout.astro';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import type { Website } from '../../../../lib/schemas';
 
 // Check admin authentication
@@ -87,30 +87,7 @@ try {
 }
 ---
 
-<Layout title={`${website.name} - Website Details`}>
-  <div class="admin-layout">
-    <!-- Admin Header -->
-    <header class="admin-header">
-      <div class="container mx-auto px-4">
-        <div class="flex justify-between items-center py-4">
-          <div class="flex items-center space-x-4">
-            <h1 class="text-xl font-bold">Feedback Admin</h1>
-            <nav class="admin-nav">
-              <a href="/admin">Dashboard</a>
-              <a href="/admin/websites" class="active">Websites</a>
-              <a href="/admin/feedback">Feedback</a>
-              <a href="/admin/users">Users</a>
-              <a href="/admin/analytics">Analytics</a>
-            </nav>
-          </div>
-          <div class="flex items-center space-x-4">
-            <span class="text-sm text-gray-600">Welcome, {currentAdmin.name}</span>
-            <a href="/admin/logout" class="btn-secondary btn-small">Logout</a>
-          </div>
-        </div>
-      </div>
-    </header>
-
+<AdminLayout title={`${website.name} - Website Details`} currentAdmin={currentAdmin}>
     <!-- Main Content -->
     <main class="admin-content">
       <div class="container mx-auto px-4 py-8">
@@ -314,8 +291,7 @@ try {
         </div>
       </div>
     </main>
-  </div>
-</Layout>
+</AdminLayout>
 
 <script is:inline>
   // Copy API key function

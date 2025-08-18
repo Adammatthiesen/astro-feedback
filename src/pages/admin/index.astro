@@ -1,7 +1,7 @@
 ---
 import { AdminUsers, db, eq, Feedback, Websites } from 'astro:db';
 import Code from '../../components/Code.astro';
-import Layout from '../../layouts/Layout.astro';
+import AdminLayout from '../../layouts/AdminLayout.astro';
 
 // Simple session check - in production, use proper session management
 const sessionCookie = Astro.cookies.get('admin-session');
@@ -39,22 +39,6 @@ const dbResults = await Promise.all([
 
 const websites = dbResults[0];
 const feedback = dbResults[1];
-const admins = dbResults[2];
-
-// Get recent feedback
-const recentFeedback = await db
-	.select({
-		id: Feedback.id,
-		title: Feedback.title,
-		type: Feedback.type,
-		status: Feedback.status,
-		createdAt: Feedback.createdAt,
-		websiteName: Websites.name,
-	})
-	.from(Feedback)
-	.innerJoin(Websites, eq(Feedback.websiteId, Websites.id))
-	.orderBy(Feedback.createdAt)
-	.limit(5);
 
 // Get dashboard stats
 const stats = {
@@ -65,147 +49,123 @@ const stats = {
 };
 ---
 
-<Layout title="Admin Dashboard - Feedback API">
-    <div class="admin-layout">
-        <!-- Admin Header -->
-        <header class="admin-header">
-            <div class="container mx-auto px-4">
-                <div class="flex justify-between items-center py-4">
-                    <div class="flex items-center space-x-4">
-                        <h1 class="text-xl font-bold">Feedback Admin</h1>
-                        <nav class="admin-nav">
-                            <a href="/admin" class="active">Dashboard</a>
-                            <a href="/admin/websites">Websites</a>
-                            <a href="/admin/feedback">Feedback</a>
-                            <a href="/admin/users">Users</a>
-                            <a href="/admin/analytics">Analytics</a>
-                        </nav>
+<AdminLayout title="Admin Dashboard - Feedback API" currentAdmin={currentAdmin}>
+    <main class="admin-content">
+        <div class="container mx-auto px-4 py-8">
+            <!-- Dashboard Stats -->
+            <div class="dashboard-stats">
+                <h2 class="text-2xl font-bold mb-6">Dashboard Overview</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🌐</div>
+                        <div class="stat-info">
+                            <h3>Total Websites</h3>
+                            <p class="stat-number">{stats.totalWebsites}</p>
+                        </div>
                     </div>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-sm text-gray-600"
-                            >Welcome, {currentAdmin.name}</span
-                        >
-                        <a href="/admin/logout" class="btn-secondary btn-small"
-                            >Logout</a
-                        >
+
+                    <div class="stat-card">
+                        <div class="stat-icon">💬</div>
+                        <div class="stat-info">
+                            <h3>Total Feedback</h3>
+                            <p class="stat-number">{stats.totalFeedback}</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-info">
+                            <h3>Pending</h3>
+                            <p class="stat-number">
+                                {stats.pendingFeedback}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-info">
+                            <h3>Resolved</h3>
+                            <p class="stat-number">
+                                {stats.resolvedFeedback}
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </header>
 
-        <!-- Main Content -->
-        <main class="admin-content">
-            <div class="container mx-auto px-4 py-8">
-                <!-- Dashboard Stats -->
-                <div class="dashboard-stats">
-                    <h2 class="text-2xl font-bold mb-6">Dashboard Overview</h2>
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <h3 class="text-xl font-semibold mb-4">Quick Actions</h3>
+                <div class="action-grid">
+                    <a href="/admin/websites/new" class="action-card">
+                        <div class="action-icon">➕</div>
+                        <h4>Add Website</h4>
+                        <p>Register a new website to collect feedback</p>
+                    </a>
 
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon">🌐</div>
-                            <div class="stat-info">
-                                <h3>Total Websites</h3>
-                                <p class="stat-number">{stats.totalWebsites}</p>
-                            </div>
-                        </div>
+                    <a href="/admin/feedback?status=new" class="action-card">
+                        <div class="action-icon">👀</div>
+                        <h4>Review Feedback</h4>
+                        <p>Check new feedback submissions</p>
+                    </a>
 
-                        <div class="stat-card">
-                            <div class="stat-icon">💬</div>
-                            <div class="stat-info">
-                                <h3>Total Feedback</h3>
-                                <p class="stat-number">{stats.totalFeedback}</p>
-                            </div>
-                        </div>
+                    <a href="/admin/users/new" class="action-card">
+                        <div class="action-icon">👤</div>
+                        <h4>Add Admin User</h4>
+                        <p>Create a new admin account</p>
+                    </a>
 
-                        <div class="stat-card">
-                            <div class="stat-icon">⏳</div>
-                            <div class="stat-info">
-                                <h3>Pending</h3>
-                                <p class="stat-number">
-                                    {stats.pendingFeedback}
-                                </p>
-                            </div>
-                        </div>
+                    <a href="/admin/analytics" class="action-card">
+                        <div class="action-icon">📊</div>
+                        <h4>View Analytics</h4>
+                        <p>See feedback trends and insights</p>
+                    </a>
 
-                        <div class="stat-card">
-                            <div class="stat-icon">✅</div>
-                            <div class="stat-info">
-                                <h3>Resolved</h3>
-                                <p class="stat-number">
-                                    {stats.resolvedFeedback}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                    <button
+                        onclick="showCodeGenerator()"
+                        class="action-card action-button"
+                    >
+                        <div class="action-icon">💻</div>
+                        <h4>Generate Code</h4>
+                        <p>Get integration code for your website</p>
+                    </button>
+
+                    <button
+                        onclick="showApiDocs()"
+                        class="action-card action-button"
+                    >
+                        <div class="action-icon">📖</div>
+                        <h4>API Documentation</h4>
+                        <p>View API endpoints and examples</p>
+                    </button>
                 </div>
+            </div>
 
-                <!-- Quick Actions -->
-                <div class="quick-actions">
-                    <h3 class="text-xl font-semibold mb-4">Quick Actions</h3>
-                    <div class="action-grid">
-                        <a href="/admin/websites/new" class="action-card">
-                            <div class="action-icon">➕</div>
-                            <h4>Add Website</h4>
-                            <p>Register a new website to collect feedback</p>
-                        </a>
-
-                        <a
-                            href="/admin/feedback?status=new"
-                            class="action-card"
+            <!-- Code Generator Modal -->
+            <div id="code-generator-modal" class="modal">
+                <div class="modal-content large-modal">
+                    <div class="modal-header">
+                        <h3>Integration Code Generator</h3>
+                        <button
+                            onclick="closeModal('code-generator-modal')"
+                            class="modal-close">×</button
                         >
-                            <div class="action-icon">👀</div>
-                            <h4>Review Feedback</h4>
-                            <p>Check new feedback submissions</p>
-                        </a>
-
-                        <a href="/admin/users/new" class="action-card">
-                            <div class="action-icon">👤</div>
-                            <h4>Add Admin User</h4>
-                            <p>Create a new admin account</p>
-                        </a>
-
-                        <a href="/admin/analytics" class="action-card">
-                            <div class="action-icon">📊</div>
-                            <h4>View Analytics</h4>
-                            <p>See feedback trends and insights</p>
-                        </a>
-
-                        <button 
-                            onclick="showCodeGenerator()" 
-                            class="action-card action-button"
-                        >
-                            <div class="action-icon">💻</div>
-                            <h4>Generate Code</h4>
-                            <p>Get integration code for your website</p>
-                        </button>
-
-                        <button 
-                            onclick="showApiDocs()" 
-                            class="action-card action-button"
-                        >
-                            <div class="action-icon">📖</div>
-                            <h4>API Documentation</h4>
-                            <p>View API endpoints and examples</p>
-                        </button>
                     </div>
-                </div>
 
-                <!-- Code Generator Modal -->
-                <div id="code-generator-modal" class="modal">
-                    <div class="modal-content large-modal">
-                        <div class="modal-header">
-                            <h3>Integration Code Generator</h3>
-                            <button onclick="closeModal('code-generator-modal')" class="modal-close">×</button>
-                        </div>
-                        
-                        <div class="modal-body">
-                            <!-- Website Selection -->
-                            <div class="form-section">
-                                <h4>Select Website</h4>
-                                <select id="website-selector" onchange="updateCodeSamples()">
-                                    <option value="">Choose a website...</option>
-                                    {websites.map(website => (
-                                        <option 
+                    <div class="modal-body">
+                        <!-- Website Selection -->
+                        <div class="form-section">
+                            <h4>Select Website</h4>
+                            <select
+                                id="website-selector"
+                                onchange="updateCodeSamples()"
+                            >
+                                <option value="">Choose a website...</option>
+                                {
+                                    websites.map((website) => (
+                                        <option
                                             value={website.id}
                                             data-domain={website.domain}
                                             data-api-key={website.apiKey}
@@ -213,195 +173,283 @@ const stats = {
                                         >
                                             {website.name} ({website.domain})
                                         </option>
-                                    ))}
-                                </select>
-                            </div>
+                                    ))
+                                }
+                            </select>
+                        </div>
 
-                            <!-- Code Tabs -->
-                            <div class="code-tabs">
-                                <button class="tab-button active" onclick="showTab('html-form')">HTML Form</button>
-                                <button class="tab-button" onclick="showTab('javascript')">JavaScript</button>
-                                <button class="tab-button" onclick="showTab('curl')">cURL</button>
-                                <button class="tab-button" onclick="showTab('widget')">Widget</button>
-                            </div>
+                        <!-- Code Tabs -->
+                        <div class="code-tabs">
+                            <button
+                                class="tab-button active"
+                                onclick="showTab('html-form')">HTML Form</button
+                            >
+                            <button
+                                class="tab-button"
+                                onclick="showTab('javascript')"
+                                >JavaScript</button
+                            >
+                            <button class="tab-button" onclick="showTab('curl')"
+                                >cURL</button
+                            >
+                            <button
+                                class="tab-button"
+                                onclick="showTab('widget')">Widget</button
+                            >
+                        </div>
 
-                            <!-- HTML Form Tab -->
-                            <div id="html-form" class="tab-content active">
-                                <h4>HTML Feedback Form</h4>
-                                <p class="tab-description">Copy this HTML form code to add a feedback form to your website:</p>
-                                <div class="code-block">
-                                    <button class="copy-code-btn" onclick="copyCode('html-code')">📋 Copy</button>
-                                    <Code id="html-code" code="<!-- Select a website to generate code -->" />
-                                </div>
-                            </div>
-
-                            <!-- JavaScript Tab -->
-                            <div id="javascript" class="tab-content">
-                                <h4>JavaScript Integration</h4>
-                                <p class="tab-description">Use this JavaScript code to submit feedback programmatically:</p>
-                                <div class="code-block">
-                                    <button class="copy-code-btn" onclick="copyCode('js-code')">📋 Copy</button>
-                                    <Code id="js-code" code="// Select a website to generate code" />
-                                </div>
-                            </div>
-
-                            <!-- cURL Tab -->
-                            <div id="curl" class="tab-content">
-                                <h4>cURL Example</h4>
-                                <p class="tab-description">Test the API directly with cURL commands:</p>
-                                <div class="code-block">
-                                    <button class="copy-code-btn" onclick="copyCode('curl-code')">📋 Copy</button>
-                                    <Code id="curl-code" code="# Select a website to generate code" />
-                                </div>
-                            </div>
-
-                            <!-- Widget Tab -->
-                            <div id="widget" class="tab-content">
-                                <h4>Feedback Widget</h4>
-                                <p class="tab-description">Add a floating feedback widget to your website:</p>
-                                <div class="code-block">
-                                    <button class="copy-code-btn" onclick="copyCode('widget-code')">📋 Copy</button>
-                                    <Code id="widget-code" code="<!-- Select a website to generate code -->" />
-                                </div>
+                        <!-- HTML Form Tab -->
+                        <div id="html-form" class="tab-content active">
+                            <h4>HTML Feedback Form</h4>
+                            <p class="tab-description">
+                                Copy this HTML form code to add a feedback form
+                                to your website:
+                            </p>
+                            <div class="code-block">
+                                <button
+                                    class="copy-code-btn"
+                                    onclick="copyCode('html-code')"
+                                    >📋 Copy</button
+                                >
+                                <Code
+                                    id="html-code"
+                                    code="<!-- Select a website to generate code -->"
+                                />
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- API Documentation Modal -->
-                <div id="api-docs-modal" class="modal">
-                    <div class="modal-content large-modal">
-                        <div class="modal-header">
-                            <h3>API Documentation</h3>
-                            <button onclick="closeModal('api-docs-modal')" class="modal-close">×</button>
+                        <!-- JavaScript Tab -->
+                        <div id="javascript" class="tab-content">
+                            <h4>JavaScript Integration</h4>
+                            <p class="tab-description">
+                                Use this JavaScript code to submit feedback
+                                programmatically:
+                            </p>
+                            <div class="code-block">
+                                <button
+                                    class="copy-code-btn"
+                                    onclick="copyCode('js-code')"
+                                    >📋 Copy</button
+                                >
+                                <Code
+                                    id="js-code"
+                                    code="// Select a website to generate code"
+                                />
+                            </div>
                         </div>
-                        
-                        <div class="modal-body">
-                            <div class="api-docs">
-                                <div class="api-section">
-                                    <h4>🔐 Authentication</h4>
-                                    <p>All API requests require an API key in the <code>x-api-key</code> header.</p>
-                                    <div class="api-example">
-                                        <strong>Header:</strong><br>
-                                        <code>x-api-key: your-website-api-key</code>
-                                    </div>
-                                </div>
 
-                                <div class="api-section">
-                                    <h4>📝 Submit Feedback</h4>
-                                    <p><strong>POST</strong> <code>/api/feedback</code></p>
-                                    <div class="api-example">
-                                        <strong>Required fields:</strong><br>
-                                        • <code>websiteId</code> (number)<br>
-                                        • <code>type</code> (bug|feature|improvement|question|compliment|complaint|other)<br>
-                                        • <code>title</code> (string)<br>
-                                        • <code>description</code> (string)
-                                    </div>
-                                    <div class="api-example">
-                                        <strong>Optional fields:</strong><br>
-                                        • <code>categoryId</code> (number)<br>
-                                        • <code>email</code> (string)<br>
-                                        • <code>name</code> (string)<br>
-                                        • <code>url</code> (string)
-                                    </div>
-                                </div>
+                        <!-- cURL Tab -->
+                        <div id="curl" class="tab-content">
+                            <h4>cURL Example</h4>
+                            <p class="tab-description">
+                                Test the API directly with cURL commands:
+                            </p>
+                            <div class="code-block">
+                                <button
+                                    class="copy-code-btn"
+                                    onclick="copyCode('curl-code')"
+                                    >📋 Copy</button
+                                >
+                                <Code
+                                    id="curl-code"
+                                    code="# Select a website to generate code"
+                                />
+                            </div>
+                        </div>
 
-                                <div class="api-section">
-                                    <h4>📋 Get Feedback</h4>
-                                    <p><strong>GET</strong> <code>/api/feedback</code></p>
-                                    <div class="api-example">
-                                        <strong>Query parameters:</strong><br>
-                                        • <code>websiteId</code> (required)<br>
-                                        • <code>limit</code> (optional, default: 10)<br>
-                                        • <code>offset</code> (optional, default: 0)<br>
-                                        • <code>status</code> (optional)<br>
-                                        • <code>type</code> (optional)
-                                    </div>
-                                </div>
-
-                                <div class="api-section">
-                                    <h4>👍 Vote on Feedback</h4>
-                                    <p><strong>POST</strong> <code>/api/feedback/&#123;id&#125;/vote</code></p>
-                                    <div class="api-example">
-                                        <strong>Body:</strong><br>
-                                        <code>&#123; "voteType": "up" | "down" &#125;</code>
-                                    </div>
-                                </div>
-
-                                <div class="api-section">
-                                    <h4>💬 Add Comment</h4>
-                                    <p><strong>POST</strong> <code>/api/feedback/&#123;id&#125;/comments</code></p>
-                                    <div class="api-example">
-                                        <strong>Body:</strong><br>
-                                        <code>&#123; "content": "string", "authorName": "string", "authorEmail": "string" &#125;</code>
-                                    </div>
-                                </div>
-
-                                <div class="api-section">
-                                    <h4>📊 Get Categories</h4>
-                                    <p><strong>GET</strong> <code>/api/categories?websiteId=&#123;id&#125;</code></p>
-                                </div>
+                        <!-- Widget Tab -->
+                        <div id="widget" class="tab-content">
+                            <h4>Feedback Widget</h4>
+                            <p class="tab-description">
+                                Add a floating feedback widget to your website:
+                            </p>
+                            <div class="code-block">
+                                <button
+                                    class="copy-code-btn"
+                                    onclick="copyCode('widget-code')"
+                                    >📋 Copy</button
+                                >
+                                <Code
+                                    id="widget-code"
+                                    code="<!-- Select a website to generate code -->"
+                                />
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </main>
-    </div>
-</Layout>
+
+            <!-- API Documentation Modal -->
+            <div id="api-docs-modal" class="modal">
+                <div class="modal-content large-modal">
+                    <div class="modal-header">
+                        <h3>API Documentation</h3>
+                        <button
+                            onclick="closeModal('api-docs-modal')"
+                            class="modal-close">×</button
+                        >
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="api-docs">
+                            <div class="api-section">
+                                <h4>🔐 Authentication</h4>
+                                <p>
+                                    All API requests require an API key in the <code
+                                        >x-api-key</code
+                                    > header.
+                                </p>
+                                <div class="api-example">
+                                    <strong>Header:</strong><br />
+                                    <code>x-api-key: your-website-api-key</code>
+                                </div>
+                            </div>
+
+                            <div class="api-section">
+                                <h4>📝 Submit Feedback</h4>
+                                <p>
+                                    <strong>POST</strong>
+                                    <code>/api/feedback</code>
+                                </p>
+                                <div class="api-example">
+                                    <strong>Required fields:</strong><br />
+                                    • <code>websiteId</code> (number)<br />
+                                    • <code>type</code> (bug|feature|improvement|question|compliment|complaint|other)<br
+                                    />
+                                    • <code>title</code> (string)<br />
+                                    • <code>description</code> (string)
+                                </div>
+                                <div class="api-example">
+                                    <strong>Optional fields:</strong><br />
+                                    • <code>categoryId</code> (number)<br />
+                                    • <code>email</code> (string)<br />
+                                    • <code>name</code> (string)<br />
+                                    • <code>url</code> (string)
+                                </div>
+                            </div>
+
+                            <div class="api-section">
+                                <h4>📋 Get Feedback</h4>
+                                <p>
+                                    <strong>GET</strong>
+                                    <code>/api/feedback</code>
+                                </p>
+                                <div class="api-example">
+                                    <strong>Query parameters:</strong><br />
+                                    • <code>websiteId</code> (required)<br />
+                                    • <code>limit</code> (optional, default: 10)<br
+                                    />
+                                    • <code>offset</code> (optional, default: 0)<br
+                                    />
+                                    • <code>status</code> (optional)<br />
+                                    • <code>type</code> (optional)
+                                </div>
+                            </div>
+
+                            <div class="api-section">
+                                <h4>👍 Vote on Feedback</h4>
+                                <p>
+                                    <strong>POST</strong>
+                                    <code
+                                        >/api/feedback/&#123;id&#125;/vote</code>
+                                </p>
+                                <div class="api-example">
+                                    <strong>Body:</strong><br />
+                                    <code
+                                        >&#123; "voteType": "up" | "down" &#125;</code
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="api-section">
+                                <h4>💬 Add Comment</h4>
+                                <p>
+                                    <strong>POST</strong>
+                                    <code
+                                        >/api/feedback/&#123;id&#125;/comments</code>
+                                </p>
+                                <div class="api-example">
+                                    <strong>Body:</strong><br />
+                                    <code
+                                        >&#123; "content": "string",
+                                        "authorName": "string", "authorEmail":
+                                        "string" &#125;</code
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="api-section">
+                                <h4>📊 Get Categories</h4>
+                                <p>
+                                    <strong>GET</strong>
+                                    <code
+                                        >/api/categories?websiteId=&#123;id&#125;</code>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</AdminLayout>
 
 <script is:inline>
     // Modal functionality
     function showCodeGenerator() {
-        document.getElementById('code-generator-modal').style.display = 'flex';
+        document.getElementById("code-generator-modal").style.display = "flex";
         updateCodeSamples();
     }
 
     function showApiDocs() {
-        document.getElementById('api-docs-modal').style.display = 'flex';
+        document.getElementById("api-docs-modal").style.display = "flex";
     }
 
     function closeModal(modalId) {
-        document.getElementById(modalId).style.display = 'none';
+        document.getElementById(modalId).style.display = "none";
     }
 
     // Tab functionality
     function showTab(tabId, event) {
         // Hide all tabs
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.remove('active');
+        document.querySelectorAll(".tab-content").forEach((tab) => {
+            tab.classList.remove("active");
         });
-        document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.classList.remove('active');
+        document.querySelectorAll(".tab-button").forEach((btn) => {
+            btn.classList.remove("active");
         });
 
         // Show selected tab
-        document.getElementById(tabId).classList.add('active');
-        event.target.classList.add('active');
+        document.getElementById(tabId).classList.add("active");
+        event.target.classList.add("active");
     }
 
     // Code generation
     function updateCodeSamples() {
-        const selector = document.getElementById('website-selector');
+        const selector = document.getElementById("website-selector");
         const selectedOption = selector.options[selector.selectedIndex];
-        
+
         if (!selectedOption.value) {
             // Reset all code blocks
-            document.getElementById('html-code').textContent = '<!-- Select a website to generate code -->';
-            document.getElementById('js-code').textContent = '// Select a website to generate code';
-            document.getElementById('curl-code').textContent = '# Select a website to generate code';
-            document.getElementById('widget-code').textContent = '<!-- Select a website to generate code -->';
+            document.getElementById("html-code").textContent =
+                "<!-- Select a website to generate code -->";
+            document.getElementById("js-code").textContent =
+                "// Select a website to generate code";
+            document.getElementById("curl-code").textContent =
+                "# Select a website to generate code";
+            document.getElementById("widget-code").textContent =
+                "<!-- Select a website to generate code -->";
             return;
         }
 
         const websiteId = selectedOption.value;
-        const domain = selectedOption.getAttribute('data-domain');
-        const apiKey = selectedOption.getAttribute('data-api-key');
-        const websiteName = selectedOption.getAttribute('data-name');
+        const domain = selectedOption.getAttribute("data-domain");
+        const apiKey = selectedOption.getAttribute("data-api-key");
+        const websiteName = selectedOption.getAttribute("data-name");
         const baseUrl = window.location.origin;
 
-			// Generate HTML Form code
-			const htmlCode = `<!-- Feedback Form for ${websiteName} -->
+        // Generate HTML Form code
+        const htmlCode = `<!-- Feedback Form for ${websiteName} -->
 <form id="feedback-form" action="${baseUrl}/api/feedback" method="POST">
     <input type="hidden" name="websiteId" value="${websiteId}">
     
@@ -470,8 +518,8 @@ document.getElementById('feedback-form').addEventListener('submit', async functi
 });
 <\/script>`;
 
-			// Generate JavaScript code
-			const jsCode = `// Feedback API Client for ${websiteName}
+        // Generate JavaScript code
+        const jsCode = `// Feedback API Client for ${websiteName}
 const feedbackAPI = {
     baseUrl: '${baseUrl}/api',
     apiKey: '${apiKey}',
@@ -520,8 +568,8 @@ feedbackAPI.submitFeedback({
     email: 'user@example.com'
 });`;
 
-			// Generate cURL code
-			const curlCode = `# Submit Feedback to ${websiteName}
+        // Generate cURL code
+        const curlCode = `# Submit Feedback to ${websiteName}
 curl -X POST ${baseUrl}/api/feedback \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: ${apiKey}" \\
@@ -538,8 +586,8 @@ curl -X POST ${baseUrl}/api/feedback \\
 curl "${baseUrl}/api/feedback?websiteId=${websiteId}&limit=10" \\
   -H "x-api-key: ${apiKey}"`;
 
-			// Generate Widget code
-			const widgetCode = `<!-- Floating Feedback Widget for ${websiteName} -->
+        // Generate Widget code
+        const widgetCode = `<!-- Floating Feedback Widget for ${websiteName} -->
 <div id="feedback-widget">
     <button id="feedback-trigger" class="feedback-button">
         💬 Feedback
@@ -686,39 +734,43 @@ curl "${baseUrl}/api/feedback?websiteId=${websiteId}&limit=10" \\
 <\/script>`;
 
         // Update code blocks
-        document.getElementById('html-code').textContent = htmlCode;
-        document.getElementById('js-code').textContent = jsCode;
-        document.getElementById('curl-code').textContent = curlCode;
-        document.getElementById('widget-code').textContent = widgetCode;
+        document.getElementById("html-code").textContent = htmlCode;
+        document.getElementById("js-code").textContent = jsCode;
+        document.getElementById("curl-code").textContent = curlCode;
+        document.getElementById("widget-code").textContent = widgetCode;
     }
 
     // Copy code functionality
     function copyCode(codeId) {
         const codeElement = document.getElementById(codeId);
         const text = codeElement.textContent;
-        
-        navigator.clipboard.writeText(text).then(function() {
-            const button = codeElement.parentElement.querySelector('.copy-code-btn');
-            const originalText = button.textContent;
-            button.textContent = '✅ Copied!';
-            button.style.background = '#10b981';
-            
-            setTimeout(function() {
-                button.textContent = originalText;
-                button.style.background = '';
-            }, 2000);
-        }).catch(function(err) {
-            console.error('Failed to copy: ', err);
-            alert('Failed to copy code to clipboard');
-        });
+
+        navigator.clipboard
+            .writeText(text)
+            .then(function () {
+                const button =
+                    codeElement.parentElement.querySelector(".copy-code-btn");
+                const originalText = button.textContent;
+                button.textContent = "✅ Copied!";
+                button.style.background = "#10b981";
+
+                setTimeout(function () {
+                    button.textContent = originalText;
+                    button.style.background = "";
+                }, 2000);
+            })
+            .catch(function (err) {
+                console.error("Failed to copy: ", err);
+                alert("Failed to copy code to clipboard");
+            });
     }
 
     // Close modals when clicking outside
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.modal').forEach(function(modal) {
-            modal.addEventListener('click', function(e) {
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll(".modal").forEach(function (modal) {
+            modal.addEventListener("click", function (e) {
                 if (e.target === modal) {
-                    modal.style.display = 'none';
+                    modal.style.display = "none";
                 }
             });
         });
@@ -734,37 +786,6 @@ curl "${baseUrl}/api/feedback?websiteId=${websiteId}&limit=10" \\
 </script>
 
 <style>
-    .admin-layout {
-        min-height: 100vh;
-        background: #f8fafc;
-    }
-
-    .admin-header {
-        background: white;
-        border-bottom: 1px solid #e5e7eb;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-
-    .admin-nav {
-        display: flex;
-        gap: 2rem;
-    }
-
-    .admin-nav a {
-        color: #6b7280;
-        text-decoration: none;
-        font-weight: 500;
-        padding: 0.5rem 0;
-        border-bottom: 2px solid transparent;
-        transition: all 0.2s;
-    }
-
-    .admin-nav a:hover,
-    .admin-nav a.active {
-        color: #2563eb;
-        border-bottom-color: #2563eb;
-    }
-
     .admin-content {
         flex: 1;
     }
@@ -1026,7 +1047,7 @@ curl "${baseUrl}/api/feedback?websiteId=${websiteId}&limit=10" \\
 
     .code-content {
         padding: 15px;
-        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
         font-size: 0.9rem;
         line-height: 1.5;
         white-space: pre-wrap;
@@ -1106,7 +1127,7 @@ curl "${baseUrl}/api/feedback?websiteId=${websiteId}&limit=10" \\
     }
 
     .endpoint-url {
-        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
         font-size: 0.9rem;
         color: #495057;
     }

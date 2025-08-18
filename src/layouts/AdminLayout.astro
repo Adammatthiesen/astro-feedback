@@ -1,0 +1,96 @@
+---
+import type { AdminUsers } from 'astro:db';
+import Layout from './Layout.astro';
+
+interface Props {
+	title: string;
+	currentAdmin: typeof AdminUsers.$inferSelect;
+}
+
+const { title, currentAdmin } = Astro.props;
+
+const navLinks = [
+	{ href: '/admin', label: 'Dashboard' },
+	{ href: '/admin/websites', label: 'Websites' },
+	{ href: '/admin/feedback', label: 'Feedback' },
+	{ href: '/admin/users', label: 'Users' },
+	{ href: '/admin/analytics', label: 'Analytics' },
+];
+
+const isActive = (href: string) => Astro.url.pathname === href;
+---
+<Layout title={title}>
+    <div class="admin-layout">
+        <!-- Admin Header -->
+        <header class="admin-header">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center space-x-4">
+                        <h1 class="text-xl font-bold">Feedback Admin</h1>
+                        <nav class="admin-nav">
+                            {
+                                navLinks.map(link => (
+                                    <a
+                                        href={link.href}
+                                        class:list={[isActive(link.href) ? 'active' : '']}
+                                    >
+                                        {link.label}
+                                    </a>
+                                ))
+                            }
+                            <!-- <a href="/admin" class="active">Dashboard</a>
+                            <a href="/admin/websites">Websites</a>
+                            <a href="/admin/feedback">Feedback</a>
+                            <a href="/admin/users">Users</a>
+                            <a href="/admin/analytics">Analytics</a> -->
+                        </nav>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600"
+                            >Welcome, {currentAdmin.name}</span
+                        >
+                        <a href="/admin/logout" class="btn-secondary btn-small"
+                            >Logout</a
+                        >
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <slot />
+    </div>
+</Layout>
+
+<style>
+    .admin-layout {
+        min-height: 100vh;
+        background: #f8fafc;
+    }
+
+    .admin-header {
+        background: white;
+        border-bottom: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .admin-nav {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .admin-nav a {
+        color: #6b7280;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.5rem 0;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .admin-nav a:hover,
+    .admin-nav a.active {
+        color: #2563eb;
+        border-bottom-color: #2563eb;
+    }
+
+</style>
