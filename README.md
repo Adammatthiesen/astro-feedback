@@ -1,428 +1,334 @@
 # Astro Feedback API
 
-A comprehensive feedback management system built with Astro and `@astrojs/db`. This API allows you to collect, manage, and analyze feedback from multiple websites through a unified interface.
+A comprehensive feedback management system built with Astro 5, TypeScript, and Astro DB. This project provides a complete solution for collecting, managing, and analyzing feedback from multiple websites through a RESTful API and an intuitive admin portal.
 
-## Features
+## 🚀 Features
 
-- 🚀 **Multi-website Support** - Manage feedback for multiple websites from a single API
-- 🗃️ **Database-driven** - Built with Astro DB for reliable data storage
-- 🔐 **API Key Authentication** - Secure access control per website
-- 📊 **Analytics & Insights** - Track feedback trends and user engagement
-- 🏷️ **Categorization** - Organize feedback with custom categories
-- 👍 **Voting System** - Users can upvote/downvote feedback
-- 💬 **Comments** - Internal and public commenting system
-- 🔄 **Real-time Updates** - Live feedback submission and updates
-- 📱 **Responsive Widget** - Ready-to-use feedback widget for easy integration
+### Core API Features
+- **Multi-website Support**: Manage feedback for multiple websites from a single instance
+- **RESTful API**: Complete CRUD operations for feedback management
+- **Real-time Analytics**: Track feedback trends, user engagement, and website performance
+- **Voting System**: Allow users to upvote/downvote feedback items
+- **Comment System**: Enable discussions on feedback items
+- **File Attachments**: Support for screenshots and document uploads
+- **Rate Limiting**: Configurable rate limiting per website
+- **API Key Authentication**: Secure access control for each website
 
-## Quick Start
+### Admin Portal Features
+- **Dashboard**: Overview of statistics, recent activity, and quick actions
+- **User Management**: Create and manage admin users with role-based permissions
+- **Website Management**: Register websites, manage API keys, and configure settings
+- **Feedback Management**: View, filter, sort, and moderate all feedback
+- **Analytics Dashboard**: Comprehensive insights with charts and metrics
+- **Session-based Authentication**: Secure admin login system
 
-### 1. Installation
+### Database Schema
+- **9 Comprehensive Tables**: Websites, Feedback, Categories, Comments, Attachments, Votes, Admin Users, Access Control, and Analytics
+- **Robust Relationships**: Foreign key constraints and optimized indexes
+- **Type Safety**: Full TypeScript integration with Astro DB
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd feedback
+## 🛠️ Tech Stack
 
-# Install dependencies
-pnpm install
-```
+- **Framework**: [Astro 5.13.2](https://astro.build/) with SSR
+- **Database**: [Astro DB](https://docs.astro.build/en/guides/astro-db/) (SQLite)
+- **Runtime**: Node.js with standalone adapter
+- **Language**: TypeScript
+- **Styling**: Custom CSS (no framework dependencies)
+- **Package Manager**: pnpm
+- **Code Quality**: Biome for linting and formatting
 
-### 2. Start Development Server
+## 📦 Installation
 
-```bash
-pnpm run dev
-```
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd feedback
+   ```
 
-Visit `http://localhost:4321` to see the demo interface.
+2. **Install dependencies**
+   ```bash
+   pnpm install
+   ```
 
-## API Endpoints
+3. **Set up the database**
+   ```bash
+   pnpm run db:push
+   ```
 
-### Authentication
+4. **Start the development server**
+   ```bash
+   pnpm dev
+   ```
 
-All API requests require an `x-api-key` header with a valid API key for the website.
+The application will be available at `http://localhost:4321`
 
-```bash
-curl -H "x-api-key: your-api-key" ...
-```
+## 🗄️ Database Schema
 
-### Feedback Management
+### Core Tables
+
+#### Websites
+Stores registered websites that can receive feedback
+- `id`, `name`, `domain`, `apiKey`, `description`
+- `isActive`, `settings` (JSON), `createdAt`, `updatedAt`
+
+#### Feedback
+Main feedback entries with comprehensive metadata
+- `id`, `websiteId`, `categoryId`, `type`, `status`, `priority`
+- `title`, `description`, `email`, `name`, `userAgent`, `url`
+- `ipAddress`, `metadata` (JSON), `isPublic`, `upvotes`, `downvotes`
+- `createdAt`, `updatedAt`
+
+#### Admin Users
+Admin users with role-based access control
+- `id`, `email`, `password`, `name`, `role`, `isActive`
+- `lastLogin`, `createdAt`
+
+#### Analytics Events
+Track various events for comprehensive analytics
+- `id`, `websiteId`, `eventType`, `eventData` (JSON)
+- `userAgent`, `ipAddress`, `createdAt`
+
+*Plus 5 additional tables for categories, comments, attachments, votes, and access control*
+
+## 🔌 API Endpoints
+
+### Feedback API
 
 #### Submit Feedback
 ```bash
 POST /api/feedback
-```
+Content-Type: application/json
+x-api-key: YOUR_API_KEY
 
-**Request Body:**
-```json
 {
   "websiteId": 1,
   "type": "bug",
-  "title": "Login button not working",
-  "description": "Detailed description of the issue",
+  "title": "Login issue",
+  "description": "Cannot login with email",
   "email": "user@example.com",
-  "name": "John Doe",
-  "categoryId": 1,
-  "url": "https://example.com/login",
-  "metadata": {
-    "browser": "Chrome",
-    "version": "91.0"
-  }
+  "name": "John Doe"
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 123,
-    "status": "new",
-    "createdAt": "2023-12-01T10:00:00Z"
-  }
-}
-```
-
-#### Get Feedback List
+#### Get Feedback
 ```bash
-GET /api/feedback?websiteId=1&limit=10&offset=0&status=new&type=bug&sort=newest
+GET /api/feedback?websiteId=1&limit=10&status=new
+x-api-key: YOUR_API_KEY
 ```
-
-**Query Parameters:**
-- `websiteId` (required): Website ID
-- `status`: Filter by status (`new`, `in_review`, `in_progress`, `resolved`, `closed`, `spam`)
-- `type`: Filter by type (`bug`, `feature`, `improvement`, `question`, `compliment`, `complaint`, `other`)
-- `category`: Filter by category slug
-- `limit`: Number of results (default: 10, max: 100)
-- `offset`: Pagination offset (default: 0)
-- `sort`: Sort order (`newest`, `oldest`, `priority`, `upvotes`)
-- `public`: Only show public feedback (`true`/`false`)
-
-#### Get Single Feedback
-```bash
-GET /api/feedback/{id}
-```
-
-#### Update Feedback
-```bash
-PATCH /api/feedback/{id}
-```
-
-**Request Body:**
-```json
-{
-  "status": "resolved",
-  "priority": "high",
-  "isPublic": true
-}
-```
-
-#### Delete Feedback
-```bash
-DELETE /api/feedback/{id}
-```
-
-### Voting
 
 #### Vote on Feedback
 ```bash
 POST /api/feedback/{id}/vote
-```
+Content-Type: application/json
+x-api-key: YOUR_API_KEY
 
-**Request Body:**
-```json
 {
-  "voteType": "up",
-  "voterEmail": "voter@example.com"
+  "voteType": "up"
 }
 ```
-
-#### Remove Vote
-```bash
-DELETE /api/feedback/{id}/vote
-```
-
-**Headers:**
-```
-x-voter-email: voter@example.com
-```
-
-### Comments
 
 #### Add Comment
 ```bash
 POST /api/feedback/{id}/comments
-```
+Content-Type: application/json
+x-api-key: YOUR_API_KEY
 
-**Request Body:**
-```json
 {
-  "content": "This is a helpful comment",
-  "authorName": "Admin User",
-  "authorEmail": "admin@example.com",
-  "isInternal": false,
-  "isFromAdmin": true
+  "content": "Thanks for the feedback!",
+  "authorName": "Admin",
+  "authorEmail": "admin@example.com"
 }
 ```
 
-#### Get Comments
+### Query Parameters
+
+- `status`: Filter by status (`new`, `in_review`, `in_progress`, `resolved`, `closed`, `spam`)
+- `type`: Filter by type (`bug`, `feature`, `improvement`, `question`, `compliment`, `complaint`, `other`)
+- `category`: Filter by category slug
+- `limit`: Number of results (default: 10)
+- `offset`: Pagination offset (default: 0)
+- `sort`: Sort order (`newest`, `oldest`, `priority`, `upvotes`)
+- `public`: Show only public feedback (`true`/`false`)
+
+## 🔐 Admin Portal
+
+### Access Routes
+
+- **Login**: `/admin/login`
+- **Dashboard**: `/admin` (redirects to main dashboard)
+- **Websites**: `/admin/websites` - Manage registered websites
+- **Users**: `/admin/users` - Manage admin users
+- **Feedback**: `/admin/feedback` - View and moderate feedback
+- **Analytics**: `/admin/analytics` - View comprehensive analytics
+
+### Default Admin Credentials
+
+The system creates a default admin user during database seeding:
+- **Email**: `admin@example.com`
+- **Password**: `admin123`
+
+⚠️ **Important**: Change these credentials immediately in production!
+
+### Admin Features
+
+#### Dashboard
+- Real-time statistics (total websites, feedback, users)
+- Recent activity feed
+- Quick action buttons
+- Code generation tools for easy API integration
+
+#### Website Management
+- Register new websites
+- Generate and manage API keys
+- Configure rate limiting and security settings
+- View website-specific analytics
+
+#### User Management
+- Create admin users with different roles (`admin`, `moderator`, `viewer`)
+- Manage user permissions and access levels
+- Track login activity
+
+#### Feedback Management
+- View all feedback with advanced filtering
+- Change feedback status and priority
+- Add internal comments and notes
+- Bulk actions for moderation
+
+#### Analytics Dashboard
+- Feedback submission trends over time
+- Popular feedback types and categories
+- User engagement metrics
+- Website performance comparisons
+
+## 🚀 Deployment
+
+### Build for Production
+
 ```bash
-GET /api/feedback/{id}/comments?includeInternal=false
+# Check and build
+pnpm run build
+
+# Or build with remote database
+pnpm run build:remote
 ```
 
-### Categories
+### Database Commands
 
-#### Get Categories
 ```bash
-GET /api/categories?websiteId=1
+# Push schema to local database
+pnpm run db:push
+
+# Push schema to remote database
+pnpm run db:push:remote
+
+# Verify database schema
+pnpm run db:verify
 ```
 
-#### Create Category
-```bash
-POST /api/categories
-```
+### Environment Configuration
 
-**Request Body:**
-```json
-{
-  "websiteId": 1,
-  "name": "Bug Reports",
-  "slug": "bugs",
-  "description": "Report bugs and technical issues",
-  "color": "#e74c3c",
-  "sortOrder": 1
-}
-```
+The application uses Astro DB which can be configured for:
+- **Local Development**: SQLite database
+- **Production**: Astro DB Cloud or self-hosted solutions
 
-### Analytics
+## 🔧 Configuration
 
-#### Get Analytics Data
-```bash
-GET /api/analytics?websiteId=1&timeframe=30d
-```
+### Website Settings
 
-**Query Parameters:**
-- `websiteId` (required): Website ID
-- `timeframe`: Time period (`7d`, `30d`, `90d`, `1y`)
-
-### Website Management
-
-#### Create Website
-```bash
-POST /api/websites
-```
-
-**Request Body:**
-```json
-{
-  "name": "My Website",
-  "domain": "example.com",
-  "description": "Main company website",
-  "settings": {
-    "rateLimit": {
-      "maxSubmissions": 10,
-      "windowMinutes": 60
-    },
-    "allowedOrigins": ["https://example.com"],
-    "moderationRequired": false,
-    "emailNotifications": true
-  }
-}
-```
-
-#### Get Websites (Admin Only)
-```bash
-GET /api/websites
-```
-
-**Headers:**
-```
-x-admin-key: your-admin-key
-```
-
-## Client SDK
-
-### Installation
-
-Include the client SDK in your project:
-
-```html
-<script type="module" src="/src/lib/feedback-client.ts"></script>
-```
-
-### Basic Usage
-
-```javascript
-import { FeedbackClient } from './feedback-client.js';
-
-const client = new FeedbackClient({
-  baseUrl: 'https://your-feedback-api.com',
-  apiKey: 'your-api-key',
-  websiteId: 1
-});
-
-// Submit feedback
-const result = await client.submitFeedback({
-  type: 'bug',
-  title: 'Button not working',
-  description: 'The submit button is not responding',
-  email: 'user@example.com'
-});
-
-// Get feedback
-const feedback = await client.getFeedback({
-  limit: 10,
-  status: 'new'
-});
-
-// Vote on feedback
-await client.vote(123, 'up', 'voter@example.com');
-```
-
-### Feedback Widget
-
-Add a feedback widget to any website:
-
-```html
-<div id="feedback-widget"></div>
-
-<script type="module">
-  import { FeedbackWidget } from './feedback-client.js';
-  
-  new FeedbackWidget({
-    baseUrl: 'https://your-feedback-api.com',
-    apiKey: 'your-api-key',
-    websiteId: 1,
-    containerId: 'feedback-widget'
-  });
-</script>
-```
-
-## Database Schema
-
-The system uses the following main tables:
-
-- **Websites** - Registered websites with API keys
-- **FeedbackCategories** - Custom categories for organizing feedback
-- **Feedback** - Main feedback entries
-- **FeedbackComments** - Comments and replies
-- **FeedbackVotes** - User votes on feedback
-- **FeedbackAttachments** - File attachments (screenshots, etc.)
-- **AdminUsers** - Admin user accounts
-- **WebsiteAdminAccess** - Admin access permissions
-- **AnalyticsEvents** - Event tracking for analytics
-
-## Configuration
-
-### Rate Limiting
-
-Configure per-website rate limiting:
+Each website can be configured with:
 
 ```json
 {
   "rateLimit": {
     "maxSubmissions": 10,
     "windowMinutes": 60
-  }
-}
-```
-
-### CORS Settings
-
-Configure allowed origins:
-
-```json
-{
-  "allowedOrigins": [
-    "https://example.com",
-    "https://www.example.com"
-  ]
-}
-```
-
-### Moderation
-
-Enable automatic moderation:
-
-```json
-{
-  "moderationRequired": true,
+  },
+  "allowedOrigins": ["https://example.com"],
+  "moderationRequired": false,
   "emailNotifications": true
 }
 ```
 
-## Deployment
+### API Key Management
 
-### Environment Variables
+- API keys are automatically generated for new websites
+- Keys provide access to specific website data only
+- Keys can be regenerated from the admin portal
 
-```env
-# Database configuration (automatically handled by Astro DB)
-# Admin access
-ADMIN_KEY=your-super-secret-admin-key
+## 📝 Development
 
-# Optional: Email service configuration
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=your-email@example.com
-SMTP_PASS=your-password
+### Project Structure
+
+```
+src/
+├── layouts/
+│   └── Layout.astro          # Base layout component
+├── lib/
+│   ├── feedback-client.ts    # API client utilities
+│   ├── schemas.ts           # Zod validation schemas
+│   └── utils.ts             # Helper functions
+├── pages/
+│   ├── index.astro          # Demo page with API examples
+│   ├── admin/               # Admin portal pages
+│   │   ├── index.astro      # Dashboard redirect
+│   │   ├── login.astro      # Admin authentication
+│   │   ├── logout.astro     # Session termination
+│   │   ├── websites/        # Website management
+│   │   ├── users/           # User management
+│   │   ├── feedback/        # Feedback management
+│   │   └── analytics/       # Analytics dashboard
+│   └── api/                 # API endpoints
+│       ├── feedback/        # Feedback CRUD operations
+│       ├── categories/      # Category management
+│       ├── websites/        # Website operations
+│       └── analytics/       # Analytics data
+db/
+├── config.ts                # Database schema definition
+└── seed.ts                  # Sample data seeding
 ```
 
-### Build and Deploy
+### Code Quality
 
-```bash
-# Build for production
-npm run build
+- **TypeScript**: Full type safety throughout the application
+- **Biome**: Linting and formatting configured
+- **Validation**: Zod schemas for runtime type checking
+- **Error Handling**: Comprehensive error handling and logging
 
-# Deploy (example with Vercel)
-npm run deploy
-```
-
-## Error Handling
-
-All API endpoints return consistent error responses:
-
-```json
-{
-  "success": false,
-  "error": "Error message",
-  "details": [
-    {
-      "field": "title",
-      "message": "Title is required"
-    }
-  ]
-}
-```
-
-Common HTTP status codes:
-- `200` - Success
-- `201` - Created
-- `400` - Bad Request (validation errors)
-- `401` - Unauthorized (missing/invalid API key)
-- `403` - Forbidden (inactive website)
-- `404` - Not Found
-- `409` - Conflict (duplicate data)
-- `429` - Rate Limited
-- `500` - Internal Server Error
-
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+4. Run quality checks (`pnpm run build`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 🆘 Support
 
-For questions or issues:
-1. Check the documentation
-2. Search existing issues
+For support, please:
+1. Check the [documentation](docs/)
+2. Search existing [issues](../../issues)
 3. Create a new issue with detailed information
+
+## 🗺️ Roadmap
+
+### Planned Features
+- [ ] Email notification system
+- [ ] Webhook support for external integrations
+- [ ] Advanced reporting and exports
+- [ ] Multi-language support
+- [ ] Theme customization
+- [ ] Mobile-responsive admin interface improvements
+- [ ] Advanced user roles and permissions
+- [ ] API rate limiting dashboard
+- [ ] Automated spam detection
+- [ ] Integration with popular help desk systems
 
 ---
 
-Built with ❤️ using [Astro](https://astro.build) and [Astro DB](https://docs.astro.build/en/guides/astro-db/)
+Built with ❤️ using [Astro](https://astro.build/)
