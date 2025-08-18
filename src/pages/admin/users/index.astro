@@ -1,75 +1,71 @@
 ---
-import Layout from "../../../layouts/Layout.astro";
-import { db, AdminUsers } from "astro:db";
-import { eq, desc } from "astro:db";
+import { AdminUsers, db, desc, eq } from 'astro:db';
+import Layout from '../../../layouts/Layout.astro';
 
 // Check admin authentication
-const sessionCookie = Astro.cookies.get("admin-session");
-let currentAdmin: any = null;
+const sessionCookie = Astro.cookies.get('admin-session');
+let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
 
 if (sessionCookie) {
-    try {
-        const sessionData = JSON.parse(sessionCookie.value);
-        currentAdmin = await db
-            .select()
-            .from(AdminUsers)
-            .where(eq(AdminUsers.id, sessionData.adminId))
-            .get();
+	try {
+		const sessionData = JSON.parse(sessionCookie.value);
+		currentAdmin = await db
+			.select()
+			.from(AdminUsers)
+			.where(eq(AdminUsers.id, sessionData.adminId))
+			.get();
 
-        if (!currentAdmin || !currentAdmin.isActive) {
-            return Astro.redirect("/admin/login");
-        }
-    } catch (error) {
-        return Astro.redirect("/admin/login");
-    }
+		if (!currentAdmin || !currentAdmin.isActive) {
+			return Astro.redirect('/admin/login');
+		}
+	} catch (error) {
+		return Astro.redirect('/admin/login');
+	}
 } else {
-    return Astro.redirect("/admin/login");
+	return Astro.redirect('/admin/login');
 }
 
 // Get all admin users
-const adminUsers = await db
-    .select()
-    .from(AdminUsers)
-    .orderBy(desc(AdminUsers.createdAt));
+const adminUsers = await db.select().from(AdminUsers).orderBy(desc(AdminUsers.createdAt));
 
 // Handle form submission for creating new admin
-if (Astro.request.method === "POST") {
-    try {
-        const formData = await Astro.request.formData();
-        const name = formData.get("name") as string;
-        const email = formData.get("email") as string;
-        const password = formData.get("password") as string;
-        const role = formData.get("role") as 'admin' | 'moderator' | 'viewer';
+if (Astro.request.method === 'POST') {
+	try {
+		const formData = await Astro.request.formData();
+		const name = formData.get('name') as string;
+		const email = formData.get('email') as string;
+		const password = formData.get('password') as string;
+		const role = formData.get('role') as 'admin' | 'moderator' | 'viewer';
 
-        if (!name || !email || !password || !role) {
-            throw new Error("All fields are required");
-        }
+		if (!name || !email || !password || !role) {
+			throw new Error('All fields are required');
+		}
 
-        // Check if email already exists
-        const existingUser = await db
-            .select()
-            .from(AdminUsers)
-            .where(eq(AdminUsers.email, email))
-            .get();
+		// Check if email already exists
+		const existingUser = await db
+			.select()
+			.from(AdminUsers)
+			.where(eq(AdminUsers.email, email))
+			.get();
 
-        if (existingUser) {
-            throw new Error("Email already exists");
-        }
+		if (existingUser) {
+			throw new Error('Email already exists');
+		}
 
-        // Create new admin user (Note: In production, hash the password!)
-        await db.insert(AdminUsers).values({
-            name,
-            email,
-            password, // In production: await bcrypt.hash(password, 10)
-            role,
-            isActive: true,
-            createdAt: new Date(),
-        });
+		// Create new admin user (Note: In production, hash the password!)
+		await db.insert(AdminUsers).values({
+			name,
+			email,
+			password, // In production: await bcrypt.hash(password, 10)
+			role,
+			isActive: true,
+			createdAt: new Date(),
+		});
 
-        return Astro.redirect("/admin/users?success=created");
-    } catch (error) {
-        console.error("Create admin error:", error);
-    }
+		return Astro.redirect('/admin/users?success=created');
+	} catch (error) {
+		console.error('Create admin error:', error);
+	}
 }
 ---
 

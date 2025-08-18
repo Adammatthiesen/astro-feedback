@@ -66,8 +66,8 @@ export const feedbackQuerySchema = z.object({
   status: z.enum(['new', 'in_review', 'in_progress', 'resolved', 'closed', 'spam']).optional(),
   type: z.enum(['bug', 'feature', 'improvement', 'question', 'compliment', 'complaint', 'other']).optional(),
   category: z.string().optional(),
-  limit: z.string().transform(val => parseInt(val) || 10).pipe(z.number().min(1).max(100)),
-  offset: z.string().transform(val => parseInt(val) || 0).pipe(z.number().min(0)),
+  limit: z.string().transform(val => Number.parseInt(val, 10) || 10).pipe(z.number().min(1).max(100)),
+  offset: z.string().transform(val => Number.parseInt(val, 10) || 0).pipe(z.number().min(0)),
   sort: z.enum(['newest', 'oldest', 'priority', 'upvotes']).default('newest'),
   public: z.string().transform(val => val === 'true').optional()
 });
@@ -133,6 +133,7 @@ export const createCategorySchema = z.object({
 });
 
 // Response Types
+// biome-ignore lint/suspicious/noExplicitAny: Allows for dynamic types
 export type ApiResponse<T = any> = {
   success: boolean;
   data?: T;

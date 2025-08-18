@@ -6,5 +6,8 @@
   ],
   "exclude": [
     "dist"
-  ]
+  ],
+  "compilerOptions": {
+    "noErrorTruncation": true
+  }
 }

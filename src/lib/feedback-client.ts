@@ -1,249 +1,262 @@
 /**
  * Astro Feedback API Client SDK
- * 
+ *
  * A simple client library for interacting with the Astro Feedback API
  */
 
 export interface FeedbackSubmission {
-  websiteId: number;
-  categoryId?: number;
-  type: 'bug' | 'feature' | 'improvement' | 'question' | 'compliment' | 'complaint' | 'other';
-  title: string;
-  description: string;
-  email?: string;
-  name?: string;
-  url?: string;
-  metadata?: Record<string, any>;
+	websiteId: number;
+	categoryId?: number;
+	type: 'bug' | 'feature' | 'improvement' | 'question' | 'compliment' | 'complaint' | 'other';
+	title: string;
+	description: string;
+	email?: string;
+	name?: string;
+	url?: string;
+	// biome-ignore lint/suspicious/noExplicitAny: Allows for dynamic types
+	metadata?: Record<string, any>;
 }
 
 export interface FeedbackItem {
-  id: number;
-  websiteId: number;
-  categoryId?: number;
-  categoryName?: string;
-  type: string;
-  status: string;
-  priority: string;
-  title: string;
-  description: string;
-  email?: string;
-  name?: string;
-  url?: string;
-  isPublic: boolean;
-  upvotes: number;
-  downvotes: number;
-  createdAt: string;
-  updatedAt: string;
+	id: number;
+	websiteId: number;
+	categoryId?: number;
+	categoryName?: string;
+	type: string;
+	status: string;
+	priority: string;
+	title: string;
+	description: string;
+	email?: string;
+	name?: string;
+	url?: string;
+	isPublic: boolean;
+	upvotes: number;
+	downvotes: number;
+	createdAt: string;
+	updatedAt: string;
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: Allows for dynamic types
 export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  pagination?: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
+	success: boolean;
+	data?: T;
+	error?: string;
+	pagination?: {
+		total: number;
+		page: number;
+		limit: number;
+		totalPages: number;
+	};
 }
 
 export interface FeedbackQueryOptions {
-  status?: 'new' | 'in_review' | 'in_progress' | 'resolved' | 'closed' | 'spam';
-  type?: 'bug' | 'feature' | 'improvement' | 'question' | 'compliment' | 'complaint' | 'other';
-  category?: string;
-  limit?: number;
-  offset?: number;
-  sort?: 'newest' | 'oldest' | 'priority' | 'upvotes';
-  public?: boolean;
+	status?: 'new' | 'in_review' | 'in_progress' | 'resolved' | 'closed' | 'spam';
+	type?: 'bug' | 'feature' | 'improvement' | 'question' | 'compliment' | 'complaint' | 'other';
+	category?: string;
+	limit?: number;
+	offset?: number;
+	sort?: 'newest' | 'oldest' | 'priority' | 'upvotes';
+	public?: boolean;
 }
 
 export class FeedbackClient {
-  private baseUrl: string;
-  private apiKey: string;
-  private websiteId: number;
+	private baseUrl: string;
+	private apiKey: string;
+	private websiteId: number;
 
-  constructor(config: {
-    baseUrl: string;
-    apiKey: string;
-    websiteId: number;
-  }) {
-    this.baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
-    this.apiKey = config.apiKey;
-    this.websiteId = config.websiteId;
-  }
+	constructor(config: {
+		baseUrl: string;
+		apiKey: string;
+		websiteId: number;
+	}) {
+		this.baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
+		this.apiKey = config.apiKey;
+		this.websiteId = config.websiteId;
+	}
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`;
-    
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        ...options.headers,
-      },
-    });
+	private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+		const url = `${this.baseUrl}${endpoint}`;
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+		const response = await fetch(url, {
+			...options,
+			headers: {
+				'Content-Type': 'application/json',
+				'x-api-key': this.apiKey,
+				...options.headers,
+			},
+		});
 
-    return response.json();
-  }
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
 
-  /**
-   * Submit new feedback
-   */
-  async submitFeedback(feedback: Omit<FeedbackSubmission, 'websiteId'>): Promise<ApiResponse<{ id: number; status: string; createdAt: string }>> {
-    return this.request('/api/feedback', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...feedback,
-        websiteId: this.websiteId,
-      }),
-    });
-  }
+		return response.json();
+	}
 
-  /**
-   * Get feedback list
-   */
-  async getFeedback(options: FeedbackQueryOptions = {}): Promise<ApiResponse<FeedbackItem[]>> {
-    const params = new URLSearchParams({
-      websiteId: this.websiteId.toString(),
-      ...Object.fromEntries(
-        Object.entries(options).map(([key, value]) => [key, value?.toString() || ''])
-      ),
-    });
+	/**
+	 * Submit new feedback
+	 */
+	async submitFeedback(
+		feedback: Omit<FeedbackSubmission, 'websiteId'>
+	): Promise<ApiResponse<{ id: number; status: string; createdAt: string }>> {
+		return this.request('/api/feedback', {
+			method: 'POST',
+			body: JSON.stringify({
+				...feedback,
+				websiteId: this.websiteId,
+			}),
+		});
+	}
 
-    return this.request(`/api/feedback?${params}`);
-  }
+	/**
+	 * Get feedback list
+	 */
+	async getFeedback(options: FeedbackQueryOptions = {}): Promise<ApiResponse<FeedbackItem[]>> {
+		const params = new URLSearchParams({
+			websiteId: this.websiteId.toString(),
+			...Object.fromEntries(
+				Object.entries(options).map(([key, value]) => [key, value?.toString() || ''])
+			),
+		});
 
-  /**
-   * Get single feedback item
-   */
-  async getFeedbackById(id: number): Promise<ApiResponse<FeedbackItem>> {
-    return this.request(`/api/feedback/${id}`);
-  }
+		return this.request(`/api/feedback?${params}`);
+	}
 
-  /**
-   * Vote on feedback
-   */
-  async vote(feedbackId: number, voteType: 'up' | 'down', voterEmail?: string): Promise<ApiResponse<{ upvotes: number; downvotes: number }>> {
-    return this.request(`/api/feedback/${feedbackId}/vote`, {
-      method: 'POST',
-      body: JSON.stringify({
-        voteType,
-        voterEmail,
-      }),
-    });
-  }
+	/**
+	 * Get single feedback item
+	 */
+	async getFeedbackById(id: number): Promise<ApiResponse<FeedbackItem>> {
+		return this.request(`/api/feedback/${id}`);
+	}
 
-  /**
-   * Remove vote
-   */
-  async removeVote(feedbackId: number, voterEmail?: string): Promise<ApiResponse<{ upvotes: number; downvotes: number }>> {
-    const headers: Record<string, string> = {};
-    if (voterEmail) {
-      headers['x-voter-email'] = voterEmail;
-    }
+	/**
+	 * Vote on feedback
+	 */
+	async vote(
+		feedbackId: number,
+		voteType: 'up' | 'down',
+		voterEmail?: string
+	): Promise<ApiResponse<{ upvotes: number; downvotes: number }>> {
+		return this.request(`/api/feedback/${feedbackId}/vote`, {
+			method: 'POST',
+			body: JSON.stringify({
+				voteType,
+				voterEmail,
+			}),
+		});
+	}
 
-    return this.request(`/api/feedback/${feedbackId}/vote`, {
-      method: 'DELETE',
-      headers,
-    });
-  }
+	/**
+	 * Remove vote
+	 */
+	async removeVote(
+		feedbackId: number,
+		voterEmail?: string
+	): Promise<ApiResponse<{ upvotes: number; downvotes: number }>> {
+		const headers: Record<string, string> = {};
+		if (voterEmail) {
+			headers['x-voter-email'] = voterEmail;
+		}
 
-  /**
-   * Add comment to feedback
-   */
-  async addComment(
-    feedbackId: number,
-    comment: {
-      content: string;
-      authorName?: string;
-      authorEmail?: string;
-      isInternal?: boolean;
-    }
-  ): Promise<ApiResponse<any>> {
-    return this.request(`/api/feedback/${feedbackId}/comments`, {
-      method: 'POST',
-      body: JSON.stringify(comment),
-    });
-  }
+		return this.request(`/api/feedback/${feedbackId}/vote`, {
+			method: 'DELETE',
+			headers,
+		});
+	}
 
-  /**
-   * Get comments for feedback
-   */
-  async getComments(feedbackId: number, includeInternal: boolean = false): Promise<ApiResponse<any[]>> {
-    const params = new URLSearchParams();
-    if (includeInternal) {
-      params.set('includeInternal', 'true');
-    }
+	/**
+	 * Add comment to feedback
+	 */
+	async addComment(
+		feedbackId: number,
+		comment: {
+			content: string;
+			authorName?: string;
+			authorEmail?: string;
+			isInternal?: boolean;
+		}
+		// biome-ignore lint/suspicious/noExplicitAny: Allows for dynamic types
+	): Promise<ApiResponse<any>> {
+		return this.request(`/api/feedback/${feedbackId}/comments`, {
+			method: 'POST',
+			body: JSON.stringify(comment),
+		});
+	}
 
-    return this.request(`/api/feedback/${feedbackId}/comments?${params}`);
-  }
+	/**
+	 * Get comments for feedback
+	 */
+	// biome-ignore lint/suspicious/noExplicitAny: Allows for dynamic types
+	async getComments(feedbackId: number, includeInternal = false): Promise<ApiResponse<any[]>> {
+		const params = new URLSearchParams();
+		if (includeInternal) {
+			params.set('includeInternal', 'true');
+		}
 
-  /**
-   * Get categories for website
-   */
-  async getCategories(): Promise<ApiResponse<any[]>> {
-    const params = new URLSearchParams({
-      websiteId: this.websiteId.toString(),
-    });
+		return this.request(`/api/feedback/${feedbackId}/comments?${params}`);
+	}
 
-    return this.request(`/api/categories?${params}`);
-  }
+	/**
+	 * Get categories for website
+	 */
+	// biome-ignore lint/suspicious/noExplicitAny: Allows for dynamic types
+	async getCategories(): Promise<ApiResponse<any[]>> {
+		const params = new URLSearchParams({
+			websiteId: this.websiteId.toString(),
+		});
 
-  /**
-   * Get analytics data
-   */
-  async getAnalytics(timeframe: '7d' | '30d' | '90d' | '1y' = '30d'): Promise<ApiResponse<any>> {
-    const params = new URLSearchParams({
-      websiteId: this.websiteId.toString(),
-      timeframe,
-    });
+		return this.request(`/api/categories?${params}`);
+	}
 
-    return this.request(`/api/analytics?${params}`);
-  }
+	/**
+	 * Get analytics data
+	 */
+
+	// biome-ignore lint/suspicious/noExplicitAny: Allows for dynamic types
+	async getAnalytics(timeframe: '7d' | '30d' | '90d' | '1y' = '30d'): Promise<ApiResponse<any>> {
+		const params = new URLSearchParams({
+			websiteId: this.websiteId.toString(),
+			timeframe,
+		});
+
+		return this.request(`/api/analytics?${params}`);
+	}
 }
 
 /**
  * Feedback Widget Class
- * 
+ *
  * A simple widget for embedding feedback forms
  */
 export class FeedbackWidget {
-  private client: FeedbackClient;
-  private container: HTMLElement;
-  private isOpen: boolean = false;
+	private client: FeedbackClient;
+	private container: HTMLElement;
+	private isOpen = false;
 
-  constructor(config: {
-    baseUrl: string;
-    apiKey: string;
-    websiteId: number;
-    containerId: string;
-  }) {
-    this.client = new FeedbackClient(config);
-    
-    const container = document.getElementById(config.containerId);
-    if (!container) {
-      throw new Error(`Container with ID "${config.containerId}" not found`);
-    }
-    this.container = container;
-    
-    this.init();
-  }
+	constructor(config: {
+		baseUrl: string;
+		apiKey: string;
+		websiteId: number;
+		containerId: string;
+	}) {
+		this.client = new FeedbackClient(config);
 
-  private init() {
-    this.render();
-  }
+		const container = document.getElementById(config.containerId);
+		if (!container) {
+			throw new Error(`Container with ID "${config.containerId}" not found`);
+		}
+		this.container = container;
 
-  private render() {
-    this.container.innerHTML = `
+		this.init();
+	}
+
+	private init() {
+		this.render();
+	}
+
+	private render() {
+		this.container.innerHTML = `
       <div id="feedback-widget" class="feedback-widget ${this.isOpen ? 'open' : ''}">
         <button id="feedback-toggle" class="feedback-toggle">
           💬 Feedback
@@ -464,92 +477,97 @@ export class FeedbackWidget {
       </style>
     `;
 
-    this.attachEventListeners();
-  }
+		this.attachEventListeners();
+	}
 
-  private attachEventListeners() {
-    const toggle = document.getElementById('feedback-toggle');
-    const close = document.getElementById('feedback-close');
-    const cancel = document.getElementById('feedback-cancel');
-    const form = document.getElementById('feedback-submit-form') as HTMLFormElement;
+	private attachEventListeners() {
+		const toggle = document.getElementById('feedback-toggle');
+		const close = document.getElementById('feedback-close');
+		const cancel = document.getElementById('feedback-cancel');
+		const form = document.getElementById('feedback-submit-form') as HTMLFormElement;
 
-    toggle?.addEventListener('click', () => this.toggle());
-    close?.addEventListener('click', () => this.close());
-    cancel?.addEventListener('click', () => this.close());
-    
-    form?.addEventListener('submit', (e) => this.handleSubmit(e));
-  }
+		toggle?.addEventListener('click', () => this.toggle());
+		close?.addEventListener('click', () => this.close());
+		cancel?.addEventListener('click', () => this.close());
 
-  private toggle() {
-    this.isOpen = !this.isOpen;
-    const widget = document.getElementById('feedback-widget');
-    if (widget) {
-      widget.classList.toggle('open', this.isOpen);
-    }
-  }
+		form?.addEventListener('submit', (e) => this.handleSubmit(e));
+	}
 
-  private close() {
-    this.isOpen = false;
-    const widget = document.getElementById('feedback-widget');
-    if (widget) {
-      widget.classList.remove('open');
-    }
-    this.clearForm();
-  }
+	private toggle() {
+		this.isOpen = !this.isOpen;
+		const widget = document.getElementById('feedback-widget');
+		if (widget) {
+			widget.classList.toggle('open', this.isOpen);
+		}
+	}
 
-  private clearForm() {
-    const form = document.getElementById('feedback-submit-form') as HTMLFormElement;
-    if (form) {
-      form.reset();
-    }
-    
-    const result = document.getElementById('feedback-result');
-    if (result) {
-      result.style.display = 'none';
-      result.className = 'feedback-result';
-    }
-  }
+	private close() {
+		this.isOpen = false;
+		const widget = document.getElementById('feedback-widget');
+		if (widget) {
+			widget.classList.remove('open');
+		}
+		this.clearForm();
+	}
 
-  private async handleSubmit(e: Event) {
-    e.preventDefault();
-    
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
-    
-    const type = (document.getElementById('feedback-type') as HTMLSelectElement).value;
-    const title = (document.getElementById('feedback-title') as HTMLInputElement).value;
-    const description = (document.getElementById('feedback-description') as HTMLTextAreaElement).value;
-    const email = (document.getElementById('feedback-email') as HTMLInputElement).value;
+	private clearForm() {
+		const form = document.getElementById('feedback-submit-form') as HTMLFormElement;
+		if (form) {
+			form.reset();
+		}
 
-    const result = document.getElementById('feedback-result');
-    if (!result) return;
+		const result = document.getElementById('feedback-result');
+		if (result) {
+			result.style.display = 'none';
+			result.className = 'feedback-result';
+		}
+	}
 
-    try {
-      const response = await this.client.submitFeedback({
-        type: type as any,
-        title,
-        description,
-        email: email || undefined,
-        url: window.location.href,
-      });
+	private async handleSubmit(e: Event) {
+		e.preventDefault();
 
-      if (response.success) {
-        result.textContent = 'Thank you! Your feedback has been submitted.';
-        result.className = 'feedback-result success';
-        result.style.display = 'block';
-        
-        setTimeout(() => {
-          this.close();
-        }, 2000);
-      } else {
-        throw new Error(response.error || 'Failed to submit feedback');
-      }
-    } catch (error) {
-      result.textContent = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      result.className = 'feedback-result error';
-      result.style.display = 'block';
-    }
-  }
+		const type = (document.getElementById('feedback-type') as HTMLSelectElement).value;
+		const title = (document.getElementById('feedback-title') as HTMLInputElement).value;
+		const description = (document.getElementById('feedback-description') as HTMLTextAreaElement)
+			.value;
+		const email = (document.getElementById('feedback-email') as HTMLInputElement).value;
+
+		const result = document.getElementById('feedback-result');
+		if (!result) return;
+
+		try {
+			const response = await this.client.submitFeedback({
+				type: type as
+					| 'bug'
+					| 'feature'
+					| 'improvement'
+					| 'question'
+					| 'compliment'
+					| 'complaint'
+					| 'other',
+				title,
+				description,
+				email: email || undefined,
+				url: window.location.href,
+			});
+
+			if (response.success) {
+				result.textContent = 'Thank you! Your feedback has been submitted.';
+				result.className = 'feedback-result success';
+				result.style.display = 'block';
+
+				setTimeout(() => {
+					this.close();
+				}, 2000);
+			} else {
+				throw new Error(response.error || 'Failed to submit feedback');
+			}
+		} catch (error) {
+			result.textContent = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+			result.className = 'feedback-result error';
+			result.style.display = 'block';
+		}
+	}
 }
 
 // Export for direct usage

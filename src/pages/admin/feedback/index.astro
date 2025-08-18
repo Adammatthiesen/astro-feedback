@@ -1,111 +1,94 @@
 ---
-import Layout from "../../../layouts/Layout.astro";
-import {
-    db,
-    Websites,
-    Feedback,
-    FeedbackCategories,
-    AdminUsers,
-} from "astro:db";
-import { eq, desc, and } from "astro:db";
+import { AdminUsers, and, db, desc, eq, Feedback, FeedbackCategories, Websites } from 'astro:db';
+import Layout from '../../../layouts/Layout.astro';
 
 // Check admin authentication
-const sessionCookie = Astro.cookies.get("admin-session");
-let currentAdmin = null;
+const sessionCookie = Astro.cookies.get('admin-session');
+let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
 
 if (sessionCookie) {
-    try {
-        const sessionData = JSON.parse(sessionCookie.value);
-        currentAdmin = await db
-            .select()
-            .from(AdminUsers)
-            .where(eq(AdminUsers.id, sessionData.adminId))
-            .get();
+	try {
+		const sessionData = JSON.parse(sessionCookie.value);
+		currentAdmin = await db
+			.select()
+			.from(AdminUsers)
+			.where(eq(AdminUsers.id, sessionData.adminId))
+			.get();
 
-        if (!currentAdmin || !currentAdmin.isActive) {
-            return Astro.redirect("/admin/login");
-        }
-    } catch (error) {
-        return Astro.redirect("/admin/login");
-    }
+		if (!currentAdmin || !currentAdmin.isActive) {
+			return Astro.redirect('/admin/login');
+		}
+	} catch (error) {
+		return Astro.redirect('/admin/login');
+	}
 } else {
-    return Astro.redirect("/admin/login");
+	return Astro.redirect('/admin/login');
 }
 
 // Get query parameters for filtering
 const url = new URL(Astro.request.url);
-const statusFilter = url.searchParams.get("status") || undefined;
-const typeFilter = url.searchParams.get("type") || undefined;
-const websiteFilter = url.searchParams.get("website") || undefined;
-const limit = parseInt(url.searchParams.get("limit") || "20");
-const offset = parseInt(url.searchParams.get("offset") || "0");
+const statusFilter = url.searchParams.get('status') || undefined;
+const typeFilter = url.searchParams.get('type') || undefined;
+const websiteFilter = url.searchParams.get('website') || undefined;
+const limit = Number.parseInt(url.searchParams.get('limit') || '20', 10);
+const offset = Number.parseInt(url.searchParams.get('offset') || '0', 10);
 
 // Build query conditions
 let conditions = [];
 if (statusFilter)
-    conditions.push(
-        eq(
-            Feedback.status,
-            statusFilter as
-                | "new"
-                | "in_review"
-                | "in_progress"
-                | "resolved"
-                | "closed"
-                | "spam",
-        ),
-    );
-if (typeFilter) 
-    conditions.push(
-        eq(
-            Feedback.type, 
-            typeFilter as
-                | "bug"
-                | "feature"
-                | "improvement"
-                | "question"
-                | "compliment"
-                | "complaint"
-                | "other"
-            ),
-    );
-if (websiteFilter)
-    conditions.push(eq(Feedback.websiteId, parseInt(websiteFilter)));
+	conditions.push(
+		eq(
+			Feedback.status,
+			statusFilter as 'new' | 'in_review' | 'in_progress' | 'resolved' | 'closed' | 'spam'
+		)
+	);
+if (typeFilter)
+	conditions.push(
+		eq(
+			Feedback.type,
+			typeFilter as
+				| 'bug'
+				| 'feature'
+				| 'improvement'
+				| 'question'
+				| 'compliment'
+				| 'complaint'
+				| 'other'
+		)
+	);
+if (websiteFilter) conditions.push(eq(Feedback.websiteId, Number.parseInt(websiteFilter, 10)));
 
 // Get feedback with website and category info
 const feedbackQuery = db
-    .select({
-        id: Feedback.id,
-        websiteId: Feedback.websiteId,
-        websiteName: Websites.name,
-        categoryId: Feedback.categoryId,
-        categoryName: FeedbackCategories.name,
-        type: Feedback.type,
-        status: Feedback.status,
-        priority: Feedback.priority,
-        title: Feedback.title,
-        description: Feedback.description,
-        email: Feedback.email,
-        name: Feedback.name,
-        url: Feedback.url,
-        isPublic: Feedback.isPublic,
-        upvotes: Feedback.upvotes,
-        downvotes: Feedback.downvotes,
-        createdAt: Feedback.createdAt,
-        updatedAt: Feedback.updatedAt,
-    })
-    .from(Feedback)
-    .leftJoin(Websites, eq(Feedback.websiteId, Websites.id))
-    .leftJoin(
-        FeedbackCategories,
-        eq(Feedback.categoryId, FeedbackCategories.id),
-    )
-    .orderBy(desc(Feedback.createdAt))
-    .limit(limit)
-    .offset(offset);
+	.select({
+		id: Feedback.id,
+		websiteId: Feedback.websiteId,
+		websiteName: Websites.name,
+		categoryId: Feedback.categoryId,
+		categoryName: FeedbackCategories.name,
+		type: Feedback.type,
+		status: Feedback.status,
+		priority: Feedback.priority,
+		title: Feedback.title,
+		description: Feedback.description,
+		email: Feedback.email,
+		name: Feedback.name,
+		url: Feedback.url,
+		isPublic: Feedback.isPublic,
+		upvotes: Feedback.upvotes,
+		downvotes: Feedback.downvotes,
+		createdAt: Feedback.createdAt,
+		updatedAt: Feedback.updatedAt,
+	})
+	.from(Feedback)
+	.leftJoin(Websites, eq(Feedback.websiteId, Websites.id))
+	.leftJoin(FeedbackCategories, eq(Feedback.categoryId, FeedbackCategories.id))
+	.orderBy(desc(Feedback.createdAt))
+	.limit(limit)
+	.offset(offset);
 
 if (conditions.length > 0) {
-    feedbackQuery.where(and(...conditions));
+	feedbackQuery.where(and(...conditions));
 }
 
 const feedback = await feedbackQuery;
@@ -115,19 +98,19 @@ const websites = await db.select().from(Websites);
 
 // Get stats for different statuses
 const statusStats = {
-    new: 0,
-    in_review: 0,
-    in_progress: 0,
-    resolved: 0,
-    closed: 0,
-    spam: 0,
+	new: 0,
+	in_review: 0,
+	in_progress: 0,
+	resolved: 0,
+	closed: 0,
+	spam: 0,
 };
 
 const allFeedback = await db.select({ status: Feedback.status }).from(Feedback);
 allFeedback.forEach((item) => {
-    if (statusStats.hasOwnProperty(item.status)) {
-        statusStats[item.status]++;
-    }
+	if (Object.hasOwn(statusStats, item.status)) {
+		statusStats[item.status]++;
+	}
 });
 ---
 

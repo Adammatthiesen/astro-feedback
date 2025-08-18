@@ -11,17 +11,17 @@
     "astro": "astro",
     "db:push": "astro db push",
     "db:push:remote": "astro db push --remote",
-    "db:verify": "astro db verify",
-    "db:studio": "astro db studio"
+    "db:verify": "astro db verify"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
     "@astrojs/db": "^0.17.1",
     "@astrojs/node": "^9.4.2",
     "astro": "^5.13.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.9.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.2.0",
     "@types/node": "^22.10.2"
   }
 }

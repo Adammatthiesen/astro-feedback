@@ -1,22 +1,91 @@
 ---
+import { FeedbackCategories, Websites } from 'astro:db';
 import Layout from '../layouts/Layout.astro';
-import { db, Websites, FeedbackCategories } from 'astro:db';
-import { eq } from 'astro:db';
 
-// Get sample website for demo
-const sampleWebsite = await db.select().from(Websites).limit(1).get();
-const categories = sampleWebsite ? await db
-  .select()
-  .from(FeedbackCategories)
-  .where(eq(FeedbackCategories.websiteId, sampleWebsite.id)) : [];
+const sampleWebsite: typeof Websites.$inferSelect = {
+	id: 1,
+	name: 'My Sample Website',
+	domain: 'example.com',
+	apiKey: 'sample-api-key-123',
+	description: 'A sample website for testing the feedback API',
+	isActive: true,
+	settings: {
+		rateLimit: { maxSubmissions: 10, windowMinutes: 60 },
+		allowedOrigins: ['https://example.com', 'http://localhost:4321'],
+		moderationRequired: false,
+		emailNotifications: true,
+	},
+	createdAt: new Date('2025-08-18T14:13:38.000Z'),
+	updatedAt: new Date('2025-08-18T14:13:38.000Z'),
+};
+
+const categories: (typeof FeedbackCategories.$inferSelect)[] = [
+	{
+		id: 1,
+		websiteId: 1,
+		name: 'Bug Report',
+		slug: 'bug',
+		description: 'Report bugs and technical issues',
+		color: '#e74c3c',
+		isActive: true,
+		sortOrder: 1,
+		createdAt: new Date('2025-08-18T14:13:38.000Z'),
+	},
+	{
+		id: 2,
+		websiteId: 1,
+		name: 'Feature Request',
+		slug: 'feature',
+		description: 'Suggest new features or improvements',
+		color: '#3498db',
+		isActive: true,
+		sortOrder: 2,
+		createdAt: new Date('2025-08-18T14:13:38.000Z'),
+	},
+	{
+		id: 3,
+		websiteId: 1,
+		name: 'General Feedback',
+		slug: 'general',
+		description: 'General comments and suggestions',
+		color: '#95a5a6',
+		isActive: true,
+		sortOrder: 3,
+		createdAt: new Date('2025-08-18T14:13:38.000Z'),
+	},
+];
+
+function buildSnippetSubmit(sampleWebsite: typeof Websites.$inferSelect) {
+	return `curl -X POST ${Astro.url.origin}/api/feedback \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: ${sampleWebsite.apiKey}" \\
+  -d '${JSON.stringify({
+		websiteId: `${sampleWebsite.id}`,
+		type: 'bug',
+		title: 'Login button not working',
+		description: "The login button doesn't respond when clicked",
+		email: 'user@example.com',
+	})}'`;
+}
+
+function buildSnippetGet(sampleWebsite: typeof Websites.$inferSelect) {
+	return `curl "${Astro.url.origin}/api/feedback?websiteId=${sampleWebsite.id}&limit=10" \\
+  -H "x-api-key: ${sampleWebsite.apiKey}"`;
+}
+
+function buildSnippetVote(sampleWebsite: typeof Websites.$inferSelect) {
+	return `curl -X POST ${Astro.url.origin}/api/feedback/1/vote \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: ${sampleWebsite.apiKey}" \\
+  -d '{"voteType": "up"}'`;
+}
 ---
 
 <Layout title="Feedback API Demo">
   <main class="container mx-auto px-4 py-8 max-w-4xl">
     <h1 class="text-3xl font-bold mb-8 text-center">Astro Feedback API Demo</h1>
 
-    { sampleWebsite && 
-        <div class="space-y-8">
+      <div class="space-y-8">
         <!-- API Information -->
         <section class="bg-blue-50 p-6 rounded-lg">
           <h2 class="text-xl font-semibold mb-4">API Configuration</h2>
@@ -40,6 +109,7 @@ const categories = sampleWebsite ? await db
         <!-- Feedback Submission Form -->
         <section class="bg-white border border-gray-200 p-6 rounded-lg">
           <h2 class="text-xl font-semibold mb-4">Submit Feedback</h2>
+          <div>For Demo purposes only (this form is not functional)</div>
           <form id="feedback-form" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -118,114 +188,34 @@ const categories = sampleWebsite ? await db
             <!-- Submit Feedback -->
             <div>
               <h3 class="font-medium mb-2">Submit Feedback</h3>
-              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>curl -X POST {Astro.url.origin}/api/feedback \\
-  -H "Content-Type: application/json" \\
-  -H "x-api-key: {sampleWebsite.apiKey}" \\
-  -d '{JSON.stringify({
-    "websiteId": `${sampleWebsite.id}`,
-    "type": "bug",
-    "title": "Login button not working",
-    "description": "The login button doesn't respond when clicked",
-    "email": "user@example.com"
-  }, null, 2)}'</code></pre>
+              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>{buildSnippetSubmit(sampleWebsite)}</code></pre>
             </div>
 
             <!-- Get Feedback -->
             <div>
               <h3 class="font-medium mb-2">Get Feedback</h3>
-              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>curl "{Astro.url.origin}/api/feedback?websiteId={sampleWebsite.id}&limit=10" \\
-  -H "x-api-key: {sampleWebsite.apiKey}"</code></pre>
+              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>{buildSnippetGet(sampleWebsite)}</code></pre>
             </div>
 
             <!-- Vote on Feedback -->
             <div>
               <h3 class="font-medium mb-2">Vote on Feedback</h3>
-              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>curl -X POST {Astro.url.origin}/api/feedback/1/vote \\
-  -H "Content-Type: application/json" \\
-  -H "x-api-key: {sampleWebsite.apiKey}" \\
-  -d '{JSON.stringify({"voteType": "up"})}'</code></pre>
+              <pre class="bg-gray-800 text-green-400 p-4 rounded-md text-sm overflow-x-auto"><code>{buildSnippetVote(sampleWebsite)}</code></pre>
             </div>
           </div>
         </section>
       </div>
-    }
+      
   </main>
 </Layout>
 
-<script is:inline define:vars={{ websiteId: sampleWebsite?.id, apiKey: sampleWebsite?.apiKey, baseUrl: Astro.url.origin }}>
-  // Feedback submission
-  const form = document.getElementById('feedback-form');
-  const submitResult = document.getElementById('submit-result');
-  
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const formData = new FormData(form);
-      const data = {
-        websiteId: websiteId,
-        type: formData.get('type'),
-        title: formData.get('title'),
-        description: formData.get('description'),
-        name: formData.get('name') || undefined,
-        email: formData.get('email') || undefined,
-        categoryId: formData.get('categoryId') ? parseInt(formData.get('categoryId')) : undefined
-      };
-
-      try {
-        const response = await fetch(`${baseUrl}/api/feedback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey
-          },
-          body: JSON.stringify(data)
-        });
-
-        const result = await response.json();
-        
-        if (result.success) {
-          submitResult.innerHTML = `
-            <div class="alert alert-success">
-              Feedback submitted successfully! ID: ${result.data.id}
-            </div>
-          `;
-          form.reset();
-          loadFeedback(); // Refresh the feedback list
-        } else {
-          submitResult.innerHTML = `
-            <div class="alert alert-error">
-              Error: ${result.error}
-            </div>
-          `;
-        }
-      } catch (error) {
-        submitResult.innerHTML = `
-          <div class="alert alert-error">
-            Network error: ${error.message}
-          </div>
-        `;
-      }
-    });
-  }
-
+<script>
   // Load feedback
   async function loadFeedback() {
-    const feedbackList = document.getElementById('feedback-list');
+    const feedbackList = document.getElementById('feedback-list') as HTMLElement;
 
-    const urlBuilder = new URL(`${baseUrl}/api/feedback`);
-    urlBuilder.searchParams.append('websiteId', websiteId);
-    urlBuilder.searchParams.append('limit', '5');
-    urlBuilder.searchParams.append('public', 'true');
-    
     try {
-      const response = await fetch(urlBuilder.toString(), {
-        headers: {
-          'x-api-key': apiKey
-        }
-      });
-
-      const result = await response.json();
+      const result = {"success":true,"data":[{"id":1,"websiteId":1,"categoryId":1,"type":"bug","status":"new","priority":"high","title":"Login button not working on mobile","description":"When I try to click the login button on mobile devices, nothing happens. This issue occurs on both iOS and Android.","email":"user1@example.com","name":"John Doe","url":"https://example.com/login","isPublic":true,"upvotes":5,"downvotes":0,"createdAt":"2025-08-18T14:13:38.000Z","updatedAt":"2025-08-18T14:13:38.000Z","categoryName":"Bug Report"},{"id":2,"websiteId":1,"categoryId":2,"type":"feature","status":"in_review","priority":"medium","title":"Add dark mode support","description":"It would be great to have a dark mode option for better user experience during night time browsing.","email":"user2@example.com","name":"Jane Smith","url":"https://example.com","isPublic":true,"upvotes":12,"downvotes":1,"createdAt":"2025-08-18T14:13:38.000Z","updatedAt":"2025-08-18T14:13:38.000Z","categoryName":"Feature Request"},{"id":3,"websiteId":1,"categoryId":3,"type":"compliment","status":"closed","priority":"low","title":"Great website design!","description":"I love the new design of your website. It looks modern and is very easy to navigate.","email":"user3@example.com","name":"Mike Johnson","url":"https://example.com/about","isPublic":true,"upvotes":8,"downvotes":0,"createdAt":"2025-08-18T14:13:38.000Z","updatedAt":"2025-08-18T14:13:38.000Z","categoryName":"General Feedback"}],"pagination":{"total":3,"page":1,"limit":5,"totalPages":1}};
       
       if (result.success && result.data.length > 0) {
         feedbackList.innerHTML = result.data.map(item => `
@@ -257,35 +247,33 @@ const categories = sampleWebsite ? await db
         feedbackList.innerHTML = '<p class="text-gray-500 text-center py-4">No feedback found.</p>';
       }
     } catch (error) {
-      feedbackList.innerHTML = `<p class="text-red-500 text-center py-4">Error loading feedback: ${error.message}</p>`;
+      feedbackList.innerHTML = `<p class="text-red-500 text-center py-4">Error loading feedback: ${(error as Error).message}</p>`;
     }
   }
 
-  // Vote on feedback
-  window.vote = async function(feedbackId, voteType) {
-    try {
-      const response = await fetch(`${baseUrl}/api/feedback/${feedbackId}/vote`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey
-        },
-        body: JSON.stringify({ voteType })
-      });
+  // // Vote on feedback
+  // window.vote = async function(feedbackId, voteType) {
+  //   try {
+  //     const response = await fetch(`${baseUrl}/api/feedback/${feedbackId}/vote`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'x-api-key': apiKey
+  //       },
+  //       body: JSON.stringify({ voteType })
+  //     });
 
-      const result = await response.json();
+  //     const result = await response.json();
       
-      if (result.success) {
-        loadFeedback(); // Refresh to show updated vote counts
-      } else {
-        alert('Error voting: ' + result.error);
-      }
-    } catch (error) {
-      alert('Error voting: ' + error.message);
-    }
-  };
-
-  // Helper functions (removed since we're using predefined badge classes)
+  //     if (result.success) {
+  //       loadFeedback(); // Refresh to show updated vote counts
+  //     } else {
+  //       alert('Error voting: ' + result.error);
+  //     }
+  //   } catch (error) {
+  //     alert('Error voting: ' + error.message);
+  //   }
+  // };
 
   // Refresh button
   const refreshButton = document.getElementById('refresh-feedback');
@@ -294,9 +282,7 @@ const categories = sampleWebsite ? await db
   }
 
   // Load feedback on page load
-  if (websiteId && apiKey) {
-    loadFeedback();
-  }
+  loadFeedback();
 </script>
 
 <style>

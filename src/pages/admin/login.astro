@@ -1,44 +1,43 @@
 ---
-import Layout from "../../layouts/Layout.astro";
+import Layout from '../../layouts/Layout.astro';
 
 // Handle login form submission
-if (Astro.request.method === "POST") {
-    try {
-        const formData = await Astro.request.formData();
-        const email = formData.get("email") as string;
-        const password = formData.get("password") as string;
+if (Astro.request.method === 'POST') {
+	try {
+		const formData = await Astro.request.formData();
+		const email = formData.get('email') as string;
+		const password = formData.get('password') as string;
 
-        // Simple authentication - in production, use proper password hashing
-        if (email === "admin@example.com" && password === "admin123") {
-            // Create a simple session
-            const sessionData = {
-                adminId: 1,
-                email: email,
-                loginTime: Date.now(),
-            };
+		// Simple authentication - in production, use proper password hashing
+		if (email === 'admin@example.com' && password === 'admin123') {
+			// Create a simple session
+			const sessionData = {
+				adminId: 1,
+				email: email,
+				loginTime: Date.now(),
+			};
 
-            Astro.cookies.set("admin-session", JSON.stringify(sessionData), {
-                httpOnly: true,
-                secure: false, // Set to true in production with HTTPS
-                sameSite: "strict",
-                maxAge: 60 * 60 * 24 * 7, // 7 days
-            });
+			Astro.cookies.set('admin-session', JSON.stringify(sessionData), {
+				httpOnly: true,
+				secure: false, // Set to true in production with HTTPS
+				sameSite: 'strict',
+				maxAge: 60 * 60 * 24 * 7, // 7 days
+			});
 
-            return Astro.redirect("/admin");
-        } else {
-            // Invalid credentials
-            return new Response("Invalid credentials", { status: 401 });
-        }
-    } catch (error) {
-        console.error("Login error:", error);
-        return new Response("Login failed", { status: 500 });
-    }
+			return Astro.redirect('/admin');
+		}
+		// Invalid credentials
+		return new Response('Invalid credentials', { status: 401 });
+	} catch (error) {
+		console.error('Login error:', error);
+		return new Response('Login failed', { status: 500 });
+	}
 }
 
 // Check if already logged in
-const sessionCookie = Astro.cookies.get("admin-session");
+const sessionCookie = Astro.cookies.get('admin-session');
 if (sessionCookie) {
-    return Astro.redirect("/admin");
+	return Astro.redirect('/admin');
 }
 ---
 

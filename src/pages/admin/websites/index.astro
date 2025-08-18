@@ -1,29 +1,28 @@
 ---
-import Layout from "../../../layouts/Layout.astro";
-import { db, Websites, AdminUsers } from "astro:db";
-import { eq } from "astro:db";
+import { AdminUsers, db, eq, Websites } from 'astro:db';
+import Layout from '../../../layouts/Layout.astro';
 
 // Check admin authentication
-const sessionCookie = Astro.cookies.get("admin-session");
-let currentAdmin = null;
+const sessionCookie = Astro.cookies.get('admin-session');
+let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
 
 if (sessionCookie) {
-    try {
-        const sessionData = JSON.parse(sessionCookie.value);
-        currentAdmin = await db
-            .select()
-            .from(AdminUsers)
-            .where(eq(AdminUsers.id, sessionData.adminId))
-            .get();
+	try {
+		const sessionData = JSON.parse(sessionCookie.value);
+		currentAdmin = await db
+			.select()
+			.from(AdminUsers)
+			.where(eq(AdminUsers.id, sessionData.adminId))
+			.get();
 
-        if (!currentAdmin || !currentAdmin.isActive) {
-            return Astro.redirect("/admin/login");
-        }
-    } catch (error) {
-        return Astro.redirect("/admin/login");
-    }
+		if (!currentAdmin || !currentAdmin.isActive) {
+			return Astro.redirect('/admin/login');
+		}
+	} catch (error) {
+		return Astro.redirect('/admin/login');
+	}
 } else {
-    return Astro.redirect("/admin/login");
+	return Astro.redirect('/admin/login');
 }
 
 // Get all websites

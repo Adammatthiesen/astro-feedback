@@ -1,63 +1,56 @@
 ---
-import Layout from "../../layouts/Layout.astro";
-import { db, AdminUsers, Websites, Feedback } from "astro:db";
-import { eq } from "astro:db";
+import { AdminUsers, db, eq, Feedback, Websites } from 'astro:db';
+import Layout from '../../layouts/Layout.astro';
 
 // Simple session check - in production, use proper session management
-const sessionCookie = Astro.cookies.get("admin-session");
-let currentAdmin = null;
+const sessionCookie = Astro.cookies.get('admin-session');
+let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
 
 if (sessionCookie) {
-    try {
-        const sessionData = JSON.parse(sessionCookie.value);
-        currentAdmin = await db
-            .select()
-            .from(AdminUsers)
-            .where(eq(AdminUsers.id, sessionData.adminId))
-            .get();
+	try {
+		const sessionData = JSON.parse(sessionCookie.value);
+		currentAdmin = await db
+			.select()
+			.from(AdminUsers)
+			.where(eq(AdminUsers.id, sessionData.adminId))
+			.get();
 
-        if (!currentAdmin || !currentAdmin.isActive) {
-            currentAdmin = null;
-            Astro.cookies.delete("admin-session");
-        }
-    } catch (error) {
-        Astro.cookies.delete("admin-session");
-    }
+		if (!currentAdmin || !currentAdmin.isActive) {
+			currentAdmin = undefined;
+			Astro.cookies.delete('admin-session');
+		}
+	} catch (error) {
+		Astro.cookies.delete('admin-session');
+	}
 }
 
 // If not logged in, redirect to login
 if (!currentAdmin) {
-    return Astro.redirect("/admin/login");
+	return Astro.redirect('/admin/login');
 }
 
 // Get dashboard stats
 const stats = {
-    totalWebsites: 0,
-    totalFeedback: 0,
-    pendingFeedback: 0,
-    resolvedFeedback: 0,
+	totalWebsites: 0,
+	totalFeedback: 0,
+	pendingFeedback: 0,
+	resolvedFeedback: 0,
 };
 
 try {
-    const websiteCount = await db.select().from(Websites);
-    stats.totalWebsites = websiteCount.length;
+	const websiteCount = await db.select().from(Websites);
+	stats.totalWebsites = websiteCount.length;
 
-    const feedbackCount = await db.select().from(Feedback);
-    stats.totalFeedback = feedbackCount.length;
+	const feedbackCount = await db.select().from(Feedback);
+	stats.totalFeedback = feedbackCount.length;
 
-    const pendingCount = await db
-        .select()
-        .from(Feedback)
-        .where(eq(Feedback.status, "new"));
-    stats.pendingFeedback = pendingCount.length;
+	const pendingCount = await db.select().from(Feedback).where(eq(Feedback.status, 'new'));
+	stats.pendingFeedback = pendingCount.length;
 
-    const resolvedCount = await db
-        .select()
-        .from(Feedback)
-        .where(eq(Feedback.status, "resolved"));
-    stats.resolvedFeedback = resolvedCount.length;
+	const resolvedCount = await db.select().from(Feedback).where(eq(Feedback.status, 'resolved'));
+	stats.resolvedFeedback = resolvedCount.length;
 } catch (error) {
-    console.error("Error fetching dashboard stats:", error);
+	console.error('Error fetching dashboard stats:', error);
 }
 ---
 
