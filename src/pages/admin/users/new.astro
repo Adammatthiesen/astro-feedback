@@ -1,0 +1,566 @@
+---
+import { AdminUsers, db, eq } from 'astro:db';
+import Layout from '../../../layouts/Layout.astro';
+
+// Check admin authentication
+const sessionCookie = Astro.cookies.get('admin-session');
+let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
+
+if (sessionCookie) {
+	try {
+		const sessionData = JSON.parse(sessionCookie.value);
+		currentAdmin = await db
+			.select()
+			.from(AdminUsers)
+			.where(eq(AdminUsers.id, sessionData.adminId))
+			.get();
+
+		if (!currentAdmin || !currentAdmin.isActive) {
+			return Astro.redirect('/admin/login');
+		}
+	} catch (error) {
+		return Astro.redirect('/admin/login');
+	}
+} else {
+	return Astro.redirect('/admin/login');
+}
+
+let error = '';
+let success = '';
+
+// Handle form submission
+if (Astro.request.method === 'POST') {
+	try {
+		const formData = await Astro.request.formData();
+		const name = formData.get('name') as string;
+		const email = formData.get('email') as string;
+		const password = formData.get('password') as string;
+		const confirmPassword = formData.get('confirmPassword') as string;
+		const role = formData.get('role') as 'admin' | 'moderator' | 'viewer';
+		const isActive = formData.get('isActive') === 'on';
+
+		if (!name || !email || !password || !role) {
+			error = 'All fields except confirm password are required';
+		} else if (password !== confirmPassword) {
+			error = 'Passwords do not match';
+		} else if (password.length < 6) {
+			error = 'Password must be at least 6 characters long';
+		} else if (!['admin', 'moderator', 'viewer'].includes(role)) {
+			error = 'Invalid role selected';
+		} else {
+			// Check if email already exists
+			const existingUser = await db
+				.select()
+				.from(AdminUsers)
+				.where(eq(AdminUsers.email, email))
+				.get();
+
+			if (existingUser) {
+				error = 'A user with this email already exists';
+			} else {
+				// Create new admin user (Note: In production, hash the password!)
+				await db.insert(AdminUsers).values({
+					name,
+					email,
+					password, // In production: await bcrypt.hash(password, 10)
+					role,
+					isActive,
+					createdAt: new Date(),
+				});
+
+				return Astro.redirect('/admin/users?success=created');
+			}
+		}
+	} catch (err) {
+		error = 'Failed to create user: ' + (err as Error).message;
+	}
+}
+---
+
+<Layout title="Add New Admin User - Admin Portal">
+  <div class="admin-layout">
+    <!-- Admin Header -->
+    <header class="admin-header">
+      <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center py-4">
+          <div class="flex items-center space-x-4">
+            <h1 class="text-xl font-bold">Feedback Admin</h1>
+            <nav class="admin-nav">
+              <a href="/admin">Dashboard</a>
+              <a href="/admin/websites">Websites</a>
+              <a href="/admin/feedback">Feedback</a>
+              <a href="/admin/users" class="active">Users</a>
+              <a href="/admin/analytics">Analytics</a>
+            </nav>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-600">Welcome, {currentAdmin.name}</span>
+            <a href="/admin/logout" class="btn-secondary btn-small">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <div class="container mx-auto px-4 py-8">
+        <!-- Page Header -->
+        <div class="page-header mb-8">
+          <div class="flex items-center gap-4 mb-4">
+            <a href="/admin/users" class="btn-secondary">← Back to Users</a>
+            <h2 class="text-2xl font-bold">Add New Admin User</h2>
+          </div>
+          <p class="text-gray-600">Create a new admin user account with specific permissions.</p>
+        </div>
+
+        <!-- Error/Success Messages -->
+        {error && (
+          <div class="alert alert-error mb-6">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {success && (
+          <div class="alert alert-success mb-6">
+            <strong>Success:</strong> {success}
+          </div>
+        )}
+
+        <!-- User Form -->
+        <div class="form-container">
+          <form method="POST" class="user-form">
+            <!-- Basic Information -->
+            <div class="form-section">
+              <h3 class="form-section-title">Basic Information</h3>
+              
+              <div class="form-group">
+                <label for="name">Full Name</label>
+                <input 
+                  type="text" 
+                  id="name" 
+                  name="name" 
+                  required
+                  placeholder="John Doe"
+                  autocomplete="name"
+                >
+                <small class="form-hint">The user's full name for display purposes</small>
+              </div>
+
+              <div class="form-group">
+                <label for="email">Email Address</label>
+                <input 
+                  type="email" 
+                  id="email" 
+                  name="email" 
+                  required
+                  placeholder="john@example.com"
+                  autocomplete="email"
+                >
+                <small class="form-hint">Used for login and notifications</small>
+              </div>
+            </div>
+
+            <!-- Security -->
+            <div class="form-section">
+              <h3 class="form-section-title">Security</h3>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="password">Password</label>
+                  <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    required
+                    minlength="6"
+                    autocomplete="new-password"
+                  >
+                  <small class="form-hint">Minimum 6 characters</small>
+                </div>
+
+                <div class="form-group">
+                  <label for="confirmPassword">Confirm Password</label>
+                  <input 
+                    type="password" 
+                    id="confirmPassword" 
+                    name="confirmPassword" 
+                    required
+                    minlength="6"
+                    autocomplete="new-password"
+                  >
+                  <small class="form-hint">Must match the password above</small>
+                </div>
+              </div>
+
+              <div class="password-requirements">
+                <h4>Password Requirements:</h4>
+                <ul>
+                  <li>At least 6 characters long</li>
+                  <li>Should include a mix of letters and numbers</li>
+                  <li>Avoid common passwords</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Permissions -->
+            <div class="form-section">
+              <h3 class="form-section-title">Permissions</h3>
+              
+              <div class="form-group">
+                <label for="role">Role</label>
+                <select id="role" name="role" required>
+                  <option value="">Select a role</option>
+                  <option value="admin">Admin</option>
+                  <option value="moderator">Moderator</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+                <small class="form-hint">Determines what actions this user can perform</small>
+              </div>
+
+              <div class="role-descriptions">
+                <div class="role-description">
+                  <h4>👑 Admin</h4>
+                  <p>Full access to all features, including user management and system settings.</p>
+                </div>
+                <div class="role-description">
+                  <h4>🛡️ Moderator</h4>
+                  <p>Can manage feedback, websites, and view analytics. Cannot manage users.</p>
+                </div>
+                <div class="role-description">
+                  <h4>👁️ Viewer</h4>
+                  <p>Read-only access to feedback and analytics. Cannot make changes.</p>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" name="isActive" checked>
+                  <span class="checkbox-custom"></span>
+                  Account is active
+                </label>
+                <small class="form-hint">Inactive accounts cannot log in</small>
+              </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Create Admin User</button>
+              <a href="/admin/users" class="btn-secondary">Cancel</a>
+            </div>
+          </form>
+        </div>
+
+        <!-- Security Notice -->
+        <div class="security-notice">
+          <h3>🔒 Security Notice</h3>
+          <p>
+            <strong>Important:</strong> In a production environment, passwords should be properly hashed 
+            using bcrypt or similar. The current implementation stores passwords in plain text for 
+            demo purposes only.
+          </p>
+          <p>
+            New users should change their password on first login and use strong, unique passwords.
+          </p>
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script>
+  // Password confirmation validation
+  document.addEventListener('DOMContentLoaded', function() {
+    const password = document.getElementById('password') as HTMLInputElement;
+    const confirmPassword = document.getElementById('confirmPassword') as HTMLInputElement;
+    
+    function validatePasswords() {
+      if (password.value && confirmPassword.value) {
+        if (password.value !== confirmPassword.value) {
+          confirmPassword.setCustomValidity('Passwords do not match');
+        } else {
+          confirmPassword.setCustomValidity('');
+        }
+      }
+    }
+    
+    password.addEventListener('input', validatePasswords);
+    confirmPassword.addEventListener('input', validatePasswords);
+  });
+
+  // Role selection handler
+  document.addEventListener('DOMContentLoaded', function() {
+    const roleSelect = document.getElementById('role') as HTMLSelectElement;
+    const roleDescriptions = document.querySelectorAll('.role-description');
+    
+    roleSelect.addEventListener('change', function() {
+      roleDescriptions.forEach(desc => {
+        desc.classList.remove('active');
+      });
+      
+      if (this.value) {
+        const selectedDesc = document.querySelector(`.role-description:nth-child(${this.selectedIndex})`);
+        if (selectedDesc) {
+          selectedDesc.classList.add('active');
+        }
+      }
+    });
+  });
+</script>
+
+<style>
+  .admin-layout {
+    min-height: 100vh;
+    background: #f8fafc;
+  }
+
+  .admin-header {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .admin-nav {
+    display: flex;
+    gap: 2rem;
+  }
+
+  .admin-nav a {
+    color: #6b7280;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .admin-nav a:hover,
+  .admin-nav a.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+  }
+
+  .form-container {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+  }
+
+  .user-form {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .form-section {
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .form-section:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .form-section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .form-hint {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    font-weight: normal;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+  }
+
+  .password-requirements {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+
+  .password-requirements h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0c4a6e;
+    margin-bottom: 0.5rem;
+  }
+
+  .password-requirements ul {
+    list-style: disc;
+    margin-left: 1.25rem;
+    color: #0369a1;
+    font-size: 0.875rem;
+  }
+
+  .password-requirements li {
+    margin-bottom: 0.25rem;
+  }
+
+  .role-descriptions {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .role-description {
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background: #f9fafb;
+    transition: all 0.2s;
+  }
+
+  .role-description.active {
+    border-color: #2563eb;
+    background: #eff6ff;
+  }
+
+  .role-description h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+  }
+
+  .role-description p {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin: 0;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-start;
+    padding-top: 1rem;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .security-notice {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-top: 2rem;
+    max-width: 800px;
+  }
+
+  .security-notice h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #92400e;
+    margin-bottom: 0.75rem;
+  }
+
+  .security-notice p {
+    font-size: 0.875rem;
+    color: #78350f;
+    margin-bottom: 0.5rem;
+  }
+
+  .security-notice p:last-child {
+    margin-bottom: 0;
+  }
+
+  .alert {
+    padding: 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+  }
+
+  .alert-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+  }
+
+  .alert-success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+  }
+
+  @media (max-width: 768px) {
+    .admin-nav {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+    
+    .form-container {
+      padding: 1.5rem;
+    }
+    
+    .form-actions {
+      flex-direction: column;
+    }
+    
+    .role-descriptions {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</Layout>

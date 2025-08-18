@@ -1,0 +1,427 @@
+---
+import { AdminUsers, db, eq, Websites } from 'astro:db';
+import Layout from '../../../layouts/Layout.astro';
+
+// Check admin authentication
+const sessionCookie = Astro.cookies.get('admin-session');
+let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
+
+if (sessionCookie) {
+	try {
+		const sessionData = JSON.parse(sessionCookie.value);
+		currentAdmin = await db
+			.select()
+			.from(AdminUsers)
+			.where(eq(AdminUsers.id, sessionData.adminId))
+			.get();
+
+		if (!currentAdmin || !currentAdmin.isActive) {
+			return Astro.redirect('/admin/login');
+		}
+	} catch (error) {
+		return Astro.redirect('/admin/login');
+	}
+} else {
+	return Astro.redirect('/admin/login');
+}
+
+let error = '';
+let success = '';
+
+// Handle form submission
+if (Astro.request.method === 'POST') {
+	try {
+		const formData = await Astro.request.formData();
+		const name = formData.get('name') as string;
+		const domain = formData.get('domain') as string;
+		const description = formData.get('description') as string;
+		const maxSubmissions = Number.parseInt(formData.get('maxSubmissions') as string, 10) || 10;
+		const windowMinutes = Number.parseInt(formData.get('windowMinutes') as string, 10) || 60;
+		const moderationRequired = formData.get('moderationRequired') === 'on';
+		const emailNotifications = formData.get('emailNotifications') === 'on';
+
+		if (!name || !domain) {
+			error = 'Name and domain are required';
+		} else {
+			// Generate API key
+			const apiKey =
+				'api_' +
+				Math.random().toString(36).substring(2, 15) +
+				Math.random().toString(36).substring(2, 15);
+
+			// Check if domain already exists
+			const existingWebsite = await db
+				.select()
+				.from(Websites)
+				.where(eq(Websites.domain, domain))
+				.get();
+
+			if (existingWebsite) {
+				error = 'A website with this domain already exists';
+			} else {
+				// Create website
+				await db.insert(Websites).values({
+					name,
+					domain,
+					description: description || null,
+					apiKey,
+					isActive: true,
+					settings: {
+						rateLimit: {
+							maxSubmissions,
+							windowMinutes,
+						},
+						allowedOrigins: [`https://${domain}`, `http://${domain}`],
+						moderationRequired,
+						emailNotifications,
+					},
+					createdAt: new Date(),
+				});
+
+				return Astro.redirect('/admin/websites?success=created');
+			}
+		}
+	} catch (err) {
+		error = 'Failed to create website: ' + (err as Error).message;
+	}
+}
+---
+
+<Layout title="Add New Website - Admin Portal">
+  <div class="admin-layout">
+    <!-- Admin Header -->
+    <header class="admin-header">
+      <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center py-4">
+          <div class="flex items-center space-x-4">
+            <h1 class="text-xl font-bold">Feedback Admin</h1>
+            <nav class="admin-nav">
+              <a href="/admin">Dashboard</a>
+              <a href="/admin/websites" class="active">Websites</a>
+              <a href="/admin/feedback">Feedback</a>
+              <a href="/admin/users">Users</a>
+              <a href="/admin/analytics">Analytics</a>
+            </nav>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-600">Welcome, {currentAdmin.name}</span>
+            <a href="/admin/logout" class="btn-secondary btn-small">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <div class="container mx-auto px-4 py-8">
+        <!-- Page Header -->
+        <div class="page-header mb-8">
+          <div class="flex items-center gap-4 mb-4">
+            <a href="/admin/websites" class="btn-secondary">← Back to Websites</a>
+            <h2 class="text-2xl font-bold">Add New Website</h2>
+          </div>
+          <p class="text-gray-600">Register a new website to start collecting feedback.</p>
+        </div>
+
+        <!-- Error/Success Messages -->
+        {error && (
+          <div class="alert alert-error mb-6">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {success && (
+          <div class="alert alert-success mb-6">
+            <strong>Success:</strong> {success}
+          </div>
+        )}
+
+        <!-- Website Form -->
+        <div class="form-container">
+          <form method="POST" class="website-form">
+            <!-- Basic Information -->
+            <div class="form-section">
+              <h3 class="form-section-title">Basic Information</h3>
+              
+              <div class="form-group">
+                <label for="name">Website Name</label>
+                <input 
+                  type="text" 
+                  id="name" 
+                  name="name" 
+                  required
+                  placeholder="My Awesome Website"
+                >
+                <small class="form-hint">The display name for your website</small>
+              </div>
+
+              <div class="form-group">
+                <label for="domain">Domain</label>
+                <input 
+                  type="text" 
+                  id="domain" 
+                  name="domain" 
+                  required
+                  placeholder="example.com"
+                  pattern="[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+                >
+                <small class="form-hint">Your website's domain (without http/https)</small>
+              </div>
+
+              <div class="form-group">
+                <label for="description">Description (Optional)</label>
+                <textarea 
+                  id="description" 
+                  name="description" 
+                  rows="3"
+                  placeholder="Brief description of your website..."
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Rate Limiting Settings -->
+            <div class="form-section">
+              <h3 class="form-section-title">Rate Limiting</h3>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="maxSubmissions">Max Submissions</label>
+                  <input 
+                    type="number" 
+                    id="maxSubmissions" 
+                    name="maxSubmissions" 
+                    value="10"
+                    min="1"
+                    max="1000"
+                  >
+                  <small class="form-hint">Maximum feedback submissions allowed</small>
+                </div>
+
+                <div class="form-group">
+                  <label for="windowMinutes">Time Window (minutes)</label>
+                  <input 
+                    type="number" 
+                    id="windowMinutes" 
+                    name="windowMinutes" 
+                    value="60"
+                    min="1"
+                    max="1440"
+                  >
+                  <small class="form-hint">Time window for rate limiting</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="form-section">
+              <h3 class="form-section-title">Settings</h3>
+              
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" name="moderationRequired">
+                  <span class="checkbox-custom"></span>
+                  Require moderation for feedback
+                </label>
+                <small class="form-hint">All feedback will need approval before being visible</small>
+              </div>
+
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" name="emailNotifications" checked>
+                  <span class="checkbox-custom"></span>
+                  Enable email notifications
+                </label>
+                <small class="form-hint">Send notifications for new feedback</small>
+              </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Create Website</button>
+              <a href="/admin/websites" class="btn-secondary">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .admin-layout {
+    min-height: 100vh;
+    background: #f8fafc;
+  }
+
+  .admin-header {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .admin-nav {
+    display: flex;
+    gap: 2rem;
+  }
+
+  .admin-nav a {
+    color: #6b7280;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .admin-nav a:hover,
+  .admin-nav a.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+  }
+
+  .form-container {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+  }
+
+  .website-form {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .form-section {
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .form-section:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .form-section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .form-group input:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .form-hint {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    font-weight: normal;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+  }
+
+  .checkbox-custom {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-start;
+    padding-top: 1rem;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .alert {
+    padding: 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+  }
+
+  .alert-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+  }
+
+  .alert-success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+  }
+
+  @media (max-width: 768px) {
+    .admin-nav {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+    
+    .form-container {
+      padding: 1.5rem;
+    }
+    
+    .form-actions {
+      flex-direction: column;
+    }
+  }
+</style>
+</Layout>

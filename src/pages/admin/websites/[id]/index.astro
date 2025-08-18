@@ -1,0 +1,658 @@
+---
+import { AdminUsers, count, db, desc, eq, Feedback, FeedbackCategories, Websites } from 'astro:db';
+import Layout from '../../../../layouts/Layout.astro';
+import type { Website } from '../../../../lib/schemas';
+
+// Check admin authentication
+const sessionCookie = Astro.cookies.get('admin-session');
+let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
+
+if (sessionCookie) {
+	try {
+		const sessionData = JSON.parse(sessionCookie.value);
+		currentAdmin = await db
+			.select()
+			.from(AdminUsers)
+			.where(eq(AdminUsers.id, sessionData.adminId))
+			.get();
+
+		if (!currentAdmin || !currentAdmin.isActive) {
+			return Astro.redirect('/admin/login');
+		}
+	} catch (error) {
+		return Astro.redirect('/admin/login');
+	}
+} else {
+	return Astro.redirect('/admin/login');
+}
+
+// Get website ID from params
+const websiteId = Number.parseInt(Astro.params.id as string, 10);
+if (Number.isNaN(websiteId)) {
+	return Astro.redirect('/admin/websites');
+}
+
+// Get website details
+const website = await db.select().from(Websites).where(eq(Websites.id, websiteId)).get();
+
+if (!website) {
+	return Astro.redirect('/admin/websites');
+}
+
+// Get website statistics
+const feedbackStats = await db
+	.select({
+		total: count(),
+		status: Feedback.status,
+	})
+	.from(Feedback)
+	.where(eq(Feedback.websiteId, websiteId))
+	.groupBy(Feedback.status);
+
+const totalFeedback = await db
+	.select({ count: count() })
+	.from(Feedback)
+	.where(eq(Feedback.websiteId, websiteId))
+	.get();
+
+// Get recent feedback for this website
+const recentFeedback = await db
+	.select({
+		id: Feedback.id,
+		type: Feedback.type,
+		status: Feedback.status,
+		title: Feedback.title,
+		description: Feedback.description,
+		createdAt: Feedback.createdAt,
+		upvotes: Feedback.upvotes,
+		downvotes: Feedback.downvotes,
+	})
+	.from(Feedback)
+	.where(eq(Feedback.websiteId, websiteId))
+	.orderBy(desc(Feedback.createdAt))
+	.limit(10);
+
+// Get categories for this website
+const categories = await db
+	.select()
+	.from(FeedbackCategories)
+	.where(eq(FeedbackCategories.websiteId, websiteId));
+
+// Parse settings safely
+let settings: Website['settings'];
+try {
+	settings = website.settings as Website['settings'];
+} catch (error) {
+	settings = undefined;
+}
+---
+
+<Layout title={`${website.name} - Website Details`}>
+  <div class="admin-layout">
+    <!-- Admin Header -->
+    <header class="admin-header">
+      <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center py-4">
+          <div class="flex items-center space-x-4">
+            <h1 class="text-xl font-bold">Feedback Admin</h1>
+            <nav class="admin-nav">
+              <a href="/admin">Dashboard</a>
+              <a href="/admin/websites" class="active">Websites</a>
+              <a href="/admin/feedback">Feedback</a>
+              <a href="/admin/users">Users</a>
+              <a href="/admin/analytics">Analytics</a>
+            </nav>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-600">Welcome, {currentAdmin.name}</span>
+            <a href="/admin/logout" class="btn-secondary btn-small">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <div class="container mx-auto px-4 py-8">
+        <!-- Page Header -->
+        <div class="page-header mb-8">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-4">
+              <a href="/admin/websites" class="btn-secondary">← Back to Websites</a>
+              <div>
+                <h2 class="text-2xl font-bold">{website.name}</h2>
+                <p class="text-gray-600">{website.domain}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class={`status-badge ${website.isActive ? 'active' : 'inactive'}`}>
+                {website.isActive ? 'Active' : 'Inactive'}
+              </span>
+              <a href={`/admin/websites/${website.id}/edit`} class="btn-primary">
+                Edit Website
+              </a>
+            </div>
+          </div>
+          
+          {website.description && (
+            <p class="text-gray-700">{website.description}</p>
+          )}
+        </div>
+
+        <!-- Website Overview -->
+        <div class="overview-section mb-8">
+          <div class="overview-grid">
+            <!-- API Information -->
+            <div class="info-card">
+              <h3 class="info-title">API Information</h3>
+              <div class="info-content">
+                <div class="info-item">
+                  <label>Website ID</label>
+                  <span class="info-value">{website.id}</span>
+                </div>
+                <div class="info-item">
+                  <label>API Key</label>
+                  <div class="api-key-display">
+                    <input 
+                      type="text" 
+                      value={website.apiKey} 
+                      readonly 
+                      class="api-key-input"
+                      id="api-key-{website.id}"
+                    >
+                    <button 
+                      onclick={`copyApiKey('api-key-${website.id}')`}
+                      class="copy-btn"
+                      title="Copy API Key"
+                    >
+                      📋
+                    </button>
+                  </div>
+                </div>
+                <div class="info-item">
+                  <label>Domain</label>
+                  <span class="info-value">{website.domain}</span>
+                </div>
+                <div class="info-item">
+                  <label>Created</label>
+                  <span class="info-value">{new Date(website.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="info-card">
+              <h3 class="info-title">Settings</h3>
+              <div class="info-content">
+                <div class="info-item">
+                  <label>Rate Limit</label>
+                  <span class="info-value">
+                    {settings?.rateLimit?.maxSubmissions || 10} submissions per {settings?.rateLimit?.windowMinutes || 60} minutes
+                  </span>
+                </div>
+                <div class="info-item">
+                  <label>Moderation</label>
+                  <span class="info-value">
+                    {settings?.moderationRequired ? 'Required' : 'Not Required'}
+                  </span>
+                </div>
+                <div class="info-item">
+                  <label>Email Notifications</label>
+                  <span class="info-value">
+                    {settings?.emailNotifications ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div class="info-item">
+                  <label>Allowed Origins</label>
+                  <div class="origins-list">
+                    {settings?.allowedOrigins?.map((origin: string) => (
+                      <span class="origin-tag">{origin}</span>
+                    )) || <span class="info-value">None specified</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="info-card">
+              <h3 class="info-title">Statistics</h3>
+              <div class="info-content">
+                <div class="info-item">
+                  <label>Total Feedback</label>
+                  <span class="info-value stat-number">{totalFeedback?.count || 0}</span>
+                </div>
+                {feedbackStats.map(stat => (
+                  <div class="info-item">
+                    <label>{stat.status.replace('_', ' ')}</label>
+                    <span class="info-value">{stat.total}</span>
+                  </div>
+                ))}
+                <div class="info-item">
+                  <label>Categories</label>
+                  <span class="info-value">{categories.length}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Categories Section -->
+        {categories.length > 0 && (
+          <div class="categories-section mb-8">
+            <h3 class="section-title">Feedback Categories</h3>
+            <div class="categories-grid">
+              {categories.map(category => (
+                <div class="category-card">
+                  <div class="category-header">
+                    <div 
+                      class="category-color" 
+                      style={`background-color: ${category.color || '#6b7280'}`}
+                    ></div>
+                    <h4 class="category-name">{category.name}</h4>
+                    <span class={`status-badge ${category.isActive ? 'active' : 'inactive'}`}>
+                      {category.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  {category.description && (
+                    <p class="category-description">{category.description}</p>
+                  )}
+                  <div class="category-meta">
+                    <span class="category-slug">#{category.slug}</span>
+                    <span class="category-order">Order: {category.sortOrder}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <!-- Recent Feedback -->
+        <div class="feedback-section">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="section-title">Recent Feedback</h3>
+            <a href={`/admin/feedback?website=${website.id}`} class="btn-secondary btn-small">
+              View All Feedback
+            </a>
+          </div>
+          
+          {recentFeedback.length > 0 ? (
+            <div class="feedback-grid">
+              {recentFeedback.map(feedback => (
+                <div class="feedback-card">
+                  <div class="feedback-header">
+                    <div class="feedback-badges">
+                      <span class={`badge badge-${feedback.type}`}>{feedback.type}</span>
+                      <span class={`badge badge-${feedback.status}`}>{feedback.status}</span>
+                    </div>
+                    <div class="feedback-votes">
+                      <span class="vote-count">👍 {feedback.upvotes}</span>
+                      <span class="vote-count">👎 {feedback.downvotes}</span>
+                    </div>
+                  </div>
+                  
+                  <h4 class="feedback-title">{feedback.title}</h4>
+                  <p class="feedback-description">{feedback.description.substring(0, 150)}...</p>
+                  
+                  <div class="feedback-footer">
+                    <span class="feedback-date">
+                      {new Date(feedback.createdAt).toLocaleDateString()}
+                    </span>
+                    <a href={`/admin/feedback?id=${feedback.id}`} class="feedback-link">
+                      View Details →
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div class="empty-state">
+              <div class="empty-icon">💬</div>
+              <h4>No feedback yet</h4>
+              <p>This website hasn't received any feedback yet.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script is:inline>
+  // Copy API key function
+  window.copyApiKey = function(inputId) {
+    const input = document.getElementById(inputId);
+    if (input) {
+      input.select();
+      input.setSelectionRange(0, 99999);
+      navigator.clipboard.writeText(input.value).then(() => {
+        // Show feedback
+        const button = input.nextElementSibling;
+        const originalText = button.textContent;
+        button.textContent = '✓';
+        button.style.color = '#059669';
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.style.color = '';
+        }, 2000);
+      });
+    }
+  };
+</script>
+
+<style>
+  .admin-layout {
+    min-height: 100vh;
+    background: #f8fafc;
+  }
+
+  .admin-header {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .admin-nav {
+    display: flex;
+    gap: 2rem;
+  }
+
+  .admin-nav a {
+    color: #6b7280;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .admin-nav a:hover,
+  .admin-nav a.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-badge.active {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .status-badge.inactive {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .info-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .info-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+  }
+
+  .info-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .info-item label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+  }
+
+  .info-value {
+    font-size: 0.875rem;
+    color: #1f2937;
+  }
+
+  .stat-number {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2563eb;
+  }
+
+  .api-key-display {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .api-key-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-family: monospace;
+    background: #f9fafb;
+  }
+
+  .copy-btn {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover {
+    background: #f3f4f6;
+  }
+
+  .origins-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .origin-tag {
+    padding: 0.25rem 0.5rem;
+    background: #f3f4f6;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    color: #374151;
+  }
+
+  .section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+
+  .category-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .category-color {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.25rem;
+    flex-shrink: 0;
+  }
+
+  .category-name {
+    font-weight: 600;
+    color: #1f2937;
+    flex: 1;
+  }
+
+  .category-description {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .category-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: #9ca3af;
+  }
+
+  .category-slug {
+    font-family: monospace;
+    background: #f3f4f6;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.125rem;
+  }
+
+  .feedback-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+
+  .feedback-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .feedback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .feedback-badges {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .feedback-votes {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+
+  .feedback-title {
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+  }
+
+  .feedback-description {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .feedback-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .feedback-date {
+    font-size: 0.75rem;
+    color: #9ca3af;
+  }
+
+  .feedback-link {
+    font-size: 0.75rem;
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .feedback-link:hover {
+    text-decoration: underline;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+  }
+
+  .empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h4 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state p {
+    color: #6b7280;
+  }
+
+  @media (max-width: 768px) {
+    .admin-nav {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .overview-grid,
+    .categories-grid,
+    .feedback-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .page-header .flex {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+    }
+  }
+</style>
+</Layout>

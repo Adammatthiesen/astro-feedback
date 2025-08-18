@@ -1,0 +1,660 @@
+---
+import { AdminUsers, db, eq, Websites } from 'astro:db';
+import Layout from '../../../../layouts/Layout.astro';
+import type { Website } from '../../../../lib/schemas';
+
+// Check admin authentication
+const sessionCookie = Astro.cookies.get('admin-session');
+let currentAdmin: typeof AdminUsers.$inferSelect | undefined;
+
+if (sessionCookie) {
+	try {
+		const sessionData = JSON.parse(sessionCookie.value);
+		currentAdmin = await db
+			.select()
+			.from(AdminUsers)
+			.where(eq(AdminUsers.id, sessionData.adminId))
+			.get();
+
+		if (!currentAdmin || !currentAdmin.isActive) {
+			return Astro.redirect('/admin/login');
+		}
+	} catch (error) {
+		return Astro.redirect('/admin/login');
+	}
+} else {
+	return Astro.redirect('/admin/login');
+}
+
+// Get website ID from params
+const websiteId = Number.parseInt(Astro.params.id as string, 10);
+if (Number.isNaN(websiteId)) {
+	return Astro.redirect('/admin/websites');
+}
+
+// Get website details
+const website = await db.select().from(Websites).where(eq(Websites.id, websiteId)).get();
+
+if (!website) {
+	return Astro.redirect('/admin/websites');
+}
+
+// Parse settings safely
+let settings: Website['settings'];
+try {
+	settings = website.settings as Website['settings'];
+} catch (error) {
+	settings = undefined;
+}
+
+let error = '';
+let success = '';
+
+// Handle form submission
+if (Astro.request.method === 'POST') {
+	try {
+		const formData = await Astro.request.formData();
+		const name = formData.get('name') as string;
+		const domain = formData.get('domain') as string;
+		const description = formData.get('description') as string;
+		const maxSubmissions = Number.parseInt(formData.get('maxSubmissions') as string, 10) || 10;
+		const windowMinutes = Number.parseInt(formData.get('windowMinutes') as string, 10) || 60;
+		const moderationRequired = formData.get('moderationRequired') === 'on';
+		const emailNotifications = formData.get('emailNotifications') === 'on';
+		const isActive = formData.get('isActive') === 'on';
+
+		if (!name || !domain) {
+			error = 'Name and domain are required';
+		} else {
+			// Check if domain already exists (excluding current website)
+			const existingWebsite = await db
+				.select()
+				.from(Websites)
+				.where(eq(Websites.domain, domain))
+				.get();
+
+			if (existingWebsite && existingWebsite.id !== websiteId) {
+				error = 'A website with this domain already exists';
+			} else {
+				// Update website
+				const updatedSettings = {
+					rateLimit: {
+						maxSubmissions,
+						windowMinutes,
+					},
+					allowedOrigins: [`https://${domain}`, `http://${domain}`],
+					moderationRequired,
+					emailNotifications,
+				};
+
+				await db
+					.update(Websites)
+					.set({
+						name,
+						domain,
+						description: description || null,
+						isActive,
+						settings: updatedSettings,
+					})
+					.where(eq(Websites.id, websiteId));
+
+				success = 'Website updated successfully';
+
+				// Refresh the website data
+				const updatedWebsite = await db
+					.select()
+					.from(Websites)
+					.where(eq(Websites.id, websiteId))
+					.get();
+
+				if (updatedWebsite) {
+					Object.assign(website, updatedWebsite);
+					settings = updatedWebsite.settings as Website['settings'];
+				}
+			}
+		}
+	} catch (err) {
+		error = `Failed to update website: ${(err as Error).message}`;
+	}
+}
+---
+
+<Layout title={`Edit ${website.name} - Admin Portal`}>
+  <div class="admin-layout">
+    <!-- Admin Header -->
+    <header class="admin-header">
+      <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center py-4">
+          <div class="flex items-center space-x-4">
+            <h1 class="text-xl font-bold">Feedback Admin</h1>
+            <nav class="admin-nav">
+              <a href="/admin">Dashboard</a>
+              <a href="/admin/websites" class="active">Websites</a>
+              <a href="/admin/feedback">Feedback</a>
+              <a href="/admin/users">Users</a>
+              <a href="/admin/analytics">Analytics</a>
+            </nav>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-600">Welcome, {currentAdmin.name}</span>
+            <a href="/admin/logout" class="btn-secondary btn-small">Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <div class="container mx-auto px-4 py-8">
+        <!-- Page Header -->
+        <div class="page-header mb-8">
+          <div class="flex items-center gap-4 mb-4">
+            <a href={`/admin/websites/${website.id}`} class="btn-secondary">← Back to Website</a>
+            <div>
+              <h2 class="text-2xl font-bold">Edit Website</h2>
+              <p class="text-gray-600">{website.name}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error/Success Messages -->
+        {error && (
+          <div class="alert alert-error mb-6">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {success && (
+          <div class="alert alert-success mb-6">
+            <strong>Success:</strong> {success}
+          </div>
+        )}
+
+        <!-- Website Form -->
+        <div class="form-container">
+          <form method="POST" class="website-form">
+            <!-- Basic Information -->
+            <div class="form-section">
+              <h3 class="form-section-title">Basic Information</h3>
+              
+              <div class="form-group">
+                <label for="name">Website Name</label>
+                <input 
+                  type="text" 
+                  id="name" 
+                  name="name" 
+                  required
+                  value={website.name}
+                  placeholder="My Awesome Website"
+                >
+                <small class="form-hint">The display name for your website</small>
+              </div>
+
+              <div class="form-group">
+                <label for="domain">Domain</label>
+                <input 
+                  type="text" 
+                  id="domain" 
+                  name="domain" 
+                  required
+                  value={website.domain}
+                  placeholder="example.com"
+                  pattern="[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+                >
+                <small class="form-hint">Your website's domain (without http/https)</small>
+              </div>
+
+              <div class="form-group">
+                <label for="description">Description (Optional)</label>
+                <textarea 
+                  id="description" 
+                  name="description" 
+                  rows="3"
+                  placeholder="Brief description of your website..."
+                >{website.description || ''}</textarea>
+              </div>
+            </div>
+
+            <!-- API Information -->
+            <div class="form-section">
+              <h3 class="form-section-title">API Information</h3>
+              
+              <div class="form-group">
+                <label for="api-key">API Key</label>
+                <div class="api-key-display">
+                  <input 
+                    type="text" 
+                    value={website.apiKey} 
+                    readonly 
+                    class="api-key-input"
+                    id="api-key-display"
+                  >
+                  <button 
+                    type="button"
+                    onclick="copyApiKey('api-key-display')"
+                    class="copy-btn"
+                    title="Copy API Key"
+                  >
+                    📋
+                  </button>
+                </div>
+                <small class="form-hint">Use this key for API requests. Cannot be changed.</small>
+              </div>
+
+              <div class="form-group">
+                <label for="website-id">Website ID</label>
+                <input 
+                  type="text" 
+                  value={website.id} 
+                  readonly 
+                  class="readonly-input"
+                >
+                <small class="form-hint">Internal ID for this website</small>
+              </div>
+            </div>
+
+            <!-- Rate Limiting Settings -->
+            <div class="form-section">
+              <h3 class="form-section-title">Rate Limiting</h3>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="maxSubmissions">Max Submissions</label>
+                  <input 
+                    type="number" 
+                    id="maxSubmissions" 
+                    name="maxSubmissions" 
+                    value={settings?.rateLimit?.maxSubmissions || 10}
+                    min="1"
+                    max="1000"
+                  >
+                  <small class="form-hint">Maximum feedback submissions allowed</small>
+                </div>
+
+                <div class="form-group">
+                  <label for="windowMinutes">Time Window (minutes)</label>
+                  <input 
+                    type="number" 
+                    id="windowMinutes" 
+                    name="windowMinutes" 
+                    value={settings?.rateLimit?.windowMinutes || 60}
+                    min="1"
+                    max="1440"
+                  >
+                  <small class="form-hint">Time window for rate limiting</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="form-section">
+              <h3 class="form-section-title">Settings</h3>
+              
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input 
+                    type="checkbox" 
+                    name="isActive"
+                    checked={website.isActive}
+                  >
+                  <span class="checkbox-custom"></span>
+                  Website is active
+                </label>
+                <small class="form-hint">Inactive websites cannot receive new feedback</small>
+              </div>
+
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input 
+                    type="checkbox" 
+                    name="moderationRequired"
+                    checked={settings?.moderationRequired}
+                  >
+                  <span class="checkbox-custom"></span>
+                  Require moderation for feedback
+                </label>
+                <small class="form-hint">All feedback will need approval before being visible</small>
+              </div>
+
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input 
+                    type="checkbox" 
+                    name="emailNotifications"
+                    checked={settings?.emailNotifications}
+                  >
+                  <span class="checkbox-custom"></span>
+                  Enable email notifications
+                </label>
+                <small class="form-hint">Send notifications for new feedback</small>
+              </div>
+            </div>
+
+            <!-- Allowed Origins -->
+            <div class="form-section">
+              <h3 class="form-section-title">Allowed Origins</h3>
+              <div class="origins-info">
+                <p class="text-sm text-gray-600 mb-3">
+                  The following origins are automatically allowed based on your domain:
+                </p>
+                <div class="origins-list">
+                  <span class="origin-tag">https://{website.domain}</span>
+                  <span class="origin-tag">http://{website.domain}</span>
+                </div>
+                <small class="form-hint">Origins are updated automatically when you change the domain</small>
+              </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Update Website</button>
+              <a href={`/admin/websites/${website.id}`} class="btn-secondary">Cancel</a>
+              <button 
+                type="button" 
+                onclick={`deleteWebsite(${website.id})`}
+                class="btn-danger"
+              >
+                Delete Website
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<script is:inline>
+  // Copy API key function
+  window.copyApiKey = function(inputId) {
+    const input = document.getElementById(inputId);
+    if (input) {
+      input.select();
+      input.setSelectionRange(0, 99999);
+      navigator.clipboard.writeText(input.value).then(() => {
+        // Show feedback
+        const button = input.nextElementSibling;
+        const originalText = button.textContent;
+        button.textContent = '✓';
+        button.style.color = '#059669';
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.style.color = '';
+        }, 2000);
+      });
+    }
+  };
+
+  // Delete website function
+  window.deleteWebsite = async function(websiteId) {
+    if (!confirm('Are you sure you want to delete this website? This action cannot be undone and will delete all associated feedback.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/admin/api/websites/${websiteId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        window.location.href = '/admin/websites?success=deleted';
+      } else {
+        alert('Failed to delete website');
+      }
+    } catch (error) {
+      alert('Error deleting website');
+      console.error('Delete failed:', error);
+    }
+  };
+</script>
+
+<style>
+  .admin-layout {
+    min-height: 100vh;
+    background: #f8fafc;
+  }
+
+  .admin-header {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .admin-nav {
+    display: flex;
+    gap: 2rem;
+  }
+
+  .admin-nav a {
+    color: #6b7280;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .admin-nav a:hover,
+  .admin-nav a.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+  }
+
+  .form-container {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+  }
+
+  .website-form {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .form-section {
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .form-section:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .form-section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .form-group input:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .readonly-input,
+  .api-key-input {
+    background: #f9fafb;
+    color: #6b7280;
+  }
+
+  .form-hint {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    font-weight: normal;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+  }
+
+  .checkbox-custom {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .api-key-display {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .api-key-input {
+    flex: 1;
+    font-family: monospace;
+    font-size: 0.75rem;
+  }
+
+  .copy-btn {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover {
+    background: #f3f4f6;
+  }
+
+  .origins-info {
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 0.375rem;
+    border: 1px solid #e5e7eb;
+  }
+
+  .origins-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .origin-tag {
+    padding: 0.25rem 0.5rem;
+    background: #e5e7eb;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    color: #374151;
+    font-family: monospace;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-start;
+    padding-top: 1rem;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .btn-danger {
+    background: #dc2626;
+    color: white;
+    border: 1px solid #dc2626;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-danger:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+  }
+
+  .alert {
+    padding: 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+  }
+
+  .alert-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+  }
+
+  .alert-success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+  }
+
+  @media (max-width: 768px) {
+    .admin-nav {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+    
+    .form-container {
+      padding: 1.5rem;
+    }
+    
+    .form-actions {
+      flex-direction: column;
+    }
+  }
+</style>
+</Layout>

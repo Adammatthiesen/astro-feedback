@@ -104,12 +104,9 @@ if (Astro.request.method === 'POST') {
                 <div class="page-header mb-8">
                     <div class="flex justify-between items-center">
                         <h2 class="text-2xl font-bold">User Management</h2>
-                        <button
-                            onclick="document.getElementById('add-user-modal').style.display = 'flex'"
-                            class="btn-primary"
-                        >
+                        <a href="/admin/users/new" class="btn-primary">
                             Add New Admin
-                        </button>
+                        </a>
                     </div>
                 </div>
 
