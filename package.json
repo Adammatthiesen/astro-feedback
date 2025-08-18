@@ -13,7 +13,8 @@
     "build:remote": "astro check && astro build --remote",
     "db:push": "astro db push",
     "db:push:remote": "astro db push --remote",
-    "db:verify": "astro db verify"
+    "db:verify": "astro db verify",
+    "db:init-prod": "astro db execute ./build-prod.ts"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
