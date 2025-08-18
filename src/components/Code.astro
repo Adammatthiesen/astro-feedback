@@ -1,4 +1,5 @@
 ---
+import AstroCodeDiffsScript from './AstroCodeDiffsScript.astro';
 import './code.css';
 
 interface Props {
@@ -22,4 +23,5 @@ if (ins) {
 	props['data-lines-inserted'] = ins;
 }
 ---
+<AstroCodeDiffsScript />
 <pre class="code-container scrollbar"><code id={id} class="custom-code" class:list={[(del || ins) && 'diff']} {...props} set:html={htmlCode}></code></pre>
