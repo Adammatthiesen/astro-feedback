@@ -3,12 +3,14 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
+    "astro": "astro",
     "dev": "astro dev",
-    "start": "astro dev",
+    "start": "node ./dist/server/entry.mjs",
+    "preview": "astro preview",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "build": "astro check && astro build",
     "build:remote": "astro check && astro build --remote",
-    "preview": "astro preview",
-    "astro": "astro",
     "db:push": "astro db push",
     "db:push:remote": "astro db push --remote",
     "db:verify": "astro db verify"
