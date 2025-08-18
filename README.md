@@ -52,7 +52,7 @@ A comprehensive feedback management system built with Astro 5, TypeScript, and A
 
 3. **Set up the database**
    ```bash
-   pnpm run db:push
+   pnpm db:push
    ```
 
 4. **Start the development server**
@@ -206,24 +206,29 @@ The system creates a default admin user during database seeding:
 
 ```bash
 # Check and build
-pnpm run build
+pnpm build
 
 # Or build with remote database
-pnpm run build:remote
+pnpm build:remote
 ```
 
 ### Database Commands
 
 ```bash
 # Push schema to local database
-pnpm run db:push
+pnpm db:push
 
 # Push schema to remote database
-pnpm run db:push:remote
+pnpm db:push:remote
 
 # Verify database schema
-pnpm run db:verify
+pnpm db:verify
+
+# Push initial production data to remote database
+pnpm db:init-prod
 ```
+
+You should setup your environments defaults using the `./build-prod.ts` file, this file will be used to create the initial database table data.
 
 ### Environment Configuration
 
