@@ -294,17 +294,43 @@ export async function verifySession(Astro: AstroGlobal) {
 
 	if (sessionCookie) {
 		try {
-			const sessionData = JSON.parse(sessionCookie.value);
+			const sessionData: {
+				adminId: number;
+				email: string;
+				loginTime: number;
+			} = JSON.parse(sessionCookie.value);
 			const adminResult = await db
 				.select()
 				.from(AdminUsers)
-				.where(eq(AdminUsers.id, sessionData.adminId));
+				.where(eq(AdminUsers.id, sessionData.adminId))
+				.get();
 
-			if (!currentAdmin || !currentAdmin.isActive) {
-				currentAdmin = undefined;
+			if (!adminResult) {
 				Astro.cookies.delete('admin-session');
+				currentAdmin = undefined;
+
+				return currentAdmin;
 			}
-			currentAdmin = adminResult[0];
+
+			if (!adminResult.isActive) {
+				Astro.cookies.delete('admin-session');
+				currentAdmin = undefined;
+
+				return currentAdmin;
+			}
+
+			// Check if current session is valid
+			const sessionAge = Date.now() - sessionData.loginTime;
+			const sessionTimeout = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+			if (sessionAge > sessionTimeout) {
+				Astro.cookies.delete('admin-session');
+				currentAdmin = undefined;
+
+				return currentAdmin;
+			}
+
+			currentAdmin = adminResult;
 		} catch (_error) {
 			Astro.cookies.delete('admin-session');
 		}

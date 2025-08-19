@@ -15,9 +15,10 @@ const navLinks = [
 	{ href: '/admin/feedback', label: 'Feedback' },
 	{ href: '/admin/users', label: 'Users' },
 	{ href: '/admin/analytics', label: 'Analytics' },
-];
-
-const isActive = (href: string) => Astro.url.pathname === href;
+].map((link) => ({
+	...link,
+	active: Astro.url.pathname === link.href,
+}));
 ---
 <Layout title={title}>
     <div class="admin-layout">
@@ -29,12 +30,12 @@ const isActive = (href: string) => Astro.url.pathname === href;
                         <h1 class="text-xl font-bold">Feedback Admin</h1>
                         <nav class="admin-nav">
                             {
-                                navLinks.map(link => (
+                                navLinks.map(({ href, label, active }) => (
                                     <a
-                                        href={link.href}
-                                        class:list={[isActive(link.href) ? 'active' : '']}
+                                        href={href}
+                                        class:list={[active && 'active']}
                                     >
-                                        {link.label}
+                                        {label}
                                     </a>
                                 ))
                             }
