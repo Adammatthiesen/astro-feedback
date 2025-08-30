@@ -1,85 +1,15 @@
 ---
-import { FeedbackCategories, Websites } from 'astro:db';
 import Code from '../components/Code.astro';
+import DemoApiInfo from '../components/demo-components/DemoApiInfo.astro';
+import DemoFeedbackForm from '../components/demo-components/DemoFeedbackForm.astro';
 import Layout from '../layouts/Layout.astro';
-
-const sampleWebsite: typeof Websites.$inferSelect = {
-	id: 1,
-	name: 'My Sample Website',
-	domain: 'example.com',
-	apiKey: 'sample-api-key-123',
-	description: 'A sample website for testing the feedback API',
-	isActive: true,
-	settings: {
-		rateLimit: { maxSubmissions: 10, windowMinutes: 60 },
-		allowedOrigins: ['https://example.com', 'http://localhost:4321'],
-		moderationRequired: false,
-		emailNotifications: true,
-	},
-	createdAt: new Date('2025-08-18T14:13:38.000Z'),
-	updatedAt: new Date('2025-08-18T14:13:38.000Z'),
-};
-
-const categories: (typeof FeedbackCategories.$inferSelect)[] = [
-	{
-		id: 1,
-		websiteId: 1,
-		name: 'Bug Report',
-		slug: 'bug',
-		description: 'Report bugs and technical issues',
-		color: '#e74c3c',
-		isActive: true,
-		sortOrder: 1,
-		createdAt: new Date('2025-08-18T14:13:38.000Z'),
-	},
-	{
-		id: 2,
-		websiteId: 1,
-		name: 'Feature Request',
-		slug: 'feature',
-		description: 'Suggest new features or improvements',
-		color: '#3498db',
-		isActive: true,
-		sortOrder: 2,
-		createdAt: new Date('2025-08-18T14:13:38.000Z'),
-	},
-	{
-		id: 3,
-		websiteId: 1,
-		name: 'General Feedback',
-		slug: 'general',
-		description: 'General comments and suggestions',
-		color: '#95a5a6',
-		isActive: true,
-		sortOrder: 3,
-		createdAt: new Date('2025-08-18T14:13:38.000Z'),
-	},
-];
-
-function buildSnippetSubmit(sampleWebsite: typeof Websites.$inferSelect) {
-	return `curl -X POST ${Astro.url.origin}/api/feedback \\
-  -H "Content-Type: application/json" \\
-  -H "x-api-key: ${sampleWebsite.apiKey}" \\
-  -d '${JSON.stringify({
-		websiteId: `${sampleWebsite.id}`,
-		type: 'bug',
-		title: 'Login button not working',
-		description: "The login button doesn't respond when clicked",
-		email: 'user@example.com',
-	})}'`;
-}
-
-function buildSnippetGet(sampleWebsite: typeof Websites.$inferSelect) {
-	return `curl "${Astro.url.origin}/api/feedback?websiteId=${sampleWebsite.id}&limit=10" \\
-  -H "x-api-key: ${sampleWebsite.apiKey}"`;
-}
-
-function buildSnippetVote(sampleWebsite: typeof Websites.$inferSelect) {
-	return `curl -X POST ${Astro.url.origin}/api/feedback/1/vote \\
-  -H "Content-Type: application/json" \\
-  -H "x-api-key: ${sampleWebsite.apiKey}" \\
-  -d '{"voteType": "up"}'`;
-}
+import {
+	buildSnippetGet,
+	buildSnippetSubmit,
+	buildSnippetVote,
+	categories,
+	sampleWebsite,
+} from '../lib/example-data';
 ---
 
 <Layout title="Feedback API Demo">
@@ -88,85 +18,10 @@ function buildSnippetVote(sampleWebsite: typeof Websites.$inferSelect) {
 
       <div class="space-y-8">
         <!-- API Information -->
-        <section class="bg-blue-50 p-6 rounded-lg">
-          <h2 class="text-xl font-semibold mb-4">API Configuration</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <strong>Website ID:</strong> {sampleWebsite.id}
-            </div>
-            <div>
-              <strong>Domain:</strong> {sampleWebsite.domain}
-            </div>
-            <div>
-              <strong>API Key:</strong> 
-              <code class="bg-gray-200 px-2 py-1 rounded text-xs">{sampleWebsite.apiKey}</code>
-            </div>
-            <div>
-              <strong>Base URL:</strong> {Astro.url.origin}/api
-            </div>
-          </div>
-        </section>
+        <DemoApiInfo {sampleWebsite} />
 
         <!-- Feedback Submission Form -->
-        <section class="bg-white border border-gray-200 p-6 rounded-lg">
-          <h2 class="text-xl font-semibold mb-4">Submit Feedback</h2>
-          <div>For Demo purposes only (this form is not functional)</div>
-          <form id="feedback-form" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label for="type">Type</label>
-                <select id="type" name="type" required>
-                  <option value="bug">Bug Report</option>
-                  <option value="feature">Feature Request</option>
-                  <option value="improvement">Improvement</option>
-                  <option value="question">Question</option>
-                  <option value="compliment">Compliment</option>
-                  <option value="complaint">Complaint</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              
-              {categories.length > 0 && (
-                <div>
-                  <label for="category">Category</label>
-                  <select id="category" name="categoryId">
-                    <option value="">No category</option>
-                    {categories.map(cat => (
-                      <option value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label for="title">Title</label>
-              <input type="text" id="title" name="title" required>
-            </div>
-
-            <div>
-              <label for="description">Description</label>
-              <textarea id="description" name="description" rows="4" required></textarea>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label for="name">Name (optional)</label>
-                <input type="text" id="name" name="name">
-              </div>
-              <div>
-                <label for="email">Email (optional)</label>
-                <input type="email" id="email" name="email">
-              </div>
-            </div>
-
-            <button type="submit" class="btn-primary">
-              Submit Feedback
-            </button>
-          </form>
-
-          <div id="submit-result" class="mt-4"></div>
-        </section>
+        <DemoFeedbackForm {categories} />
 
         <!-- Recent Feedback -->
         <section class="bg-white border border-gray-200 p-6 rounded-lg">
@@ -189,19 +44,19 @@ function buildSnippetVote(sampleWebsite: typeof Websites.$inferSelect) {
             <!-- Submit Feedback -->
             <div>
               <h3 class="font-medium mb-2">Submit Feedback</h3>
-              <Code code={buildSnippetSubmit(sampleWebsite)} />
+              <Code code={buildSnippetSubmit(sampleWebsite, Astro)} />
             </div>
 
             <!-- Get Feedback -->
             <div>
               <h3 class="font-medium mb-2">Get Feedback</h3>
-              <Code code={buildSnippetGet(sampleWebsite)} />
+              <Code code={buildSnippetGet(sampleWebsite, Astro)} />
             </div>
 
             <!-- Vote on Feedback -->
             <div>
               <h3 class="font-medium mb-2">Vote on Feedback</h3>
-              <Code code={buildSnippetVote(sampleWebsite)} />
+              <Code code={buildSnippetVote(sampleWebsite, Astro)} />
             </div>
           </div>
         </section>

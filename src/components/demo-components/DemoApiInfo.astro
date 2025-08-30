@@ -1,0 +1,33 @@
+---
+import type { Websites } from 'astro:db';
+
+interface Props {
+	sampleWebsite: typeof Websites.$inferSelect;
+}
+
+const { sampleWebsite } = Astro.props;
+---
+
+<section class="bg-blue-50 p-6 rounded-lg">
+    <h2 class="text-xl font-semibold mb-4">API Configuration</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div>
+            <strong>Website ID:</strong>
+            {sampleWebsite.id}
+        </div>
+        <div>
+            <strong>Domain:</strong>
+            {sampleWebsite.domain}
+        </div>
+        <div>
+            <strong>API Key:</strong>
+            <code class="bg-gray-200 px-2 py-1 rounded text-xs"
+                >{sampleWebsite.apiKey}</code
+            >
+        </div>
+        <div>
+            <strong>Base URL:</strong>
+            {Astro.url.origin}/api
+        </div>
+    </div>
+</section>
