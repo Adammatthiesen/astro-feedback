@@ -32,6 +32,10 @@ const INITIAL_WEBSITE = {
 	},
 };
 
+// + ---------------------------- +
+// | DO NOT EDIT BEYOND THIS LINE |
+// + ---------------------------- +
+
 export default async function seed() {
 	console.log('🌱 Seeding database...');
 
