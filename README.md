@@ -1,5 +1,7 @@
 # Astro Feedback API
 
+<img width="2329" height="1174" alt="image" src="https://github.com/user-attachments/assets/5ec51fc1-ba88-4bb2-9d6e-18b204b1cb8d" />
+
 A comprehensive feedback management system built with Astro 5, TypeScript, and Astro DB. This project provides a complete solution for collecting, managing, and analyzing feedback from multiple websites through a RESTful API and an intuitive admin portal.
 
 ## 🚀 Features
