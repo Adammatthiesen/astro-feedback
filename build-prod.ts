@@ -7,29 +7,9 @@ import { generateApiKey, generateWebsiteID, hashPassword } from './src/lib/utils
  * This should be changed for production!
  */
 const INITIAL_ADMIN_USER = {
-	email: 'admin@example.com',
+	email: 'admin@testexample.com',
 	password: 'admin123',
 	name: 'Admin User',
-};
-
-/**
- * Initial website configuration
- *
- * This should be customized for your application.
- */
-const INITIAL_WEBSITE = {
-	name: 'My Sample Website',
-	domain: 'example.com',
-	description: 'A sample website for testing the feedback API',
-	settings: {
-		rateLimit: {
-			maxSubmissions: 10,
-			windowMinutes: 60,
-		},
-		allowedOrigins: ['https://example.com', 'http://localhost:4321'],
-		moderationRequired: false,
-		emailNotifications: false, // Not yet implemented
-	},
 };
 
 // + ---------------------------- +
@@ -43,7 +23,18 @@ export default async function seed() {
 	const website = await db
 		.insert(Websites)
 		.values({
-			...INITIAL_WEBSITE,
+			name: 'My Sample Website',
+			domain: 'example.com',
+			description: 'A sample website for testing the feedback API',
+			settings: {
+				rateLimit: {
+					maxSubmissions: 10,
+					windowMinutes: 60,
+				},
+				allowedOrigins: ['https://example.com', 'http://localhost:4321'],
+				moderationRequired: false,
+				emailNotifications: false, // Not yet implemented
+			},
 			id: generateWebsiteID(),
 			apiKey: generateApiKey(),
 			isActive: true,

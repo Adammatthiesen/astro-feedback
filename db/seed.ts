@@ -1,5 +1,5 @@
 import { AdminUsers, db, Feedback, FeedbackCategories, Websites } from 'astro:db';
-import { generateApiKey, generateWebsiteID, hashPassword } from '../src/lib/utils';
+import { generateApiKey, hashPassword } from '../src/lib/utils';
 
 export default async function seed() {
 	console.log('🌱 Seeding database...');
@@ -8,7 +8,7 @@ export default async function seed() {
 	const website = await db
 		.insert(Websites)
 		.values({
-			id: generateWebsiteID(),
+			// id: generateWebsiteID(),
 			name: 'My Sample Website',
 			domain: 'example.com',
 			apiKey: generateApiKey(),

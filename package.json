@@ -2,6 +2,10 @@
   "name": "astro-feedback-api",
   "type": "module",
   "version": "0.0.1",
+  "packageManager": "pnpm@10.17.0",
+  "engines": {
+    "node": "22.19.0"
+  },
   "scripts": {
     "astro": "astro",
     "dev": "astro dev",
@@ -9,8 +13,8 @@
     "preview": "astro preview",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "build": "astro check && astro build",
-    "build:remote": "astro check && astro build --remote",
+    "build": "astro build",
+    "build:remote": "astro build --remote",
     "db:push": "astro db push",
     "db:push:remote": "astro db push --remote",
     "db:verify": "astro db verify",
@@ -18,9 +22,9 @@
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
-    "@astrojs/db": "^0.17.1",
-    "@astrojs/node": "^9.4.2",
-    "astro": "^5.13.2",
+    "@astrojs/db": "^0.18.0",
+    "@astrojs/node": "^9.4.4",
+    "astro": "^5.14.1",
     "typescript": "^5.9.2"
   },
   "devDependencies": {

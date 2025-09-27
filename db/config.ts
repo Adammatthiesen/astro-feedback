@@ -5,19 +5,14 @@ const Websites = defineTable({
 	columns: {
 		id: column.number({ primaryKey: true }),
 		name: column.text(),
-		domain: column.text({ unique: true }),
-		apiKey: column.text({ unique: true }),
+		domain: column.text(),
+		apiKey: column.text(),
 		description: column.text({ optional: true }),
 		isActive: column.boolean({ default: true }),
 		settings: column.json({ optional: true }), // JSON settings like rate limits, allowed origins
 		createdAt: column.date({ default: NOW }),
 		updatedAt: column.date({ default: NOW }),
 	},
-	indexes: [
-		{ on: ['domain'], unique: true },
-		{ on: ['apiKey'], unique: true },
-		{ on: ['isActive'] },
-	],
 });
 
 // Feedback Categories table - Different types of feedback (bug, feature, general, etc.)
@@ -33,11 +28,6 @@ const FeedbackCategories = defineTable({
 		sortOrder: column.number({ default: 0 }),
 		createdAt: column.date({ default: NOW }),
 	},
-	indexes: [
-		{ on: ['websiteId', 'slug'], unique: true },
-		{ on: ['websiteId', 'isActive'] },
-		{ on: ['websiteId', 'sortOrder'] },
-	],
 });
 
 // Feedback table - Main feedback entries
@@ -68,15 +58,6 @@ const Feedback = defineTable({
 		createdAt: column.date({ default: NOW }),
 		updatedAt: column.date({ default: NOW }),
 	},
-	indexes: [
-		{ on: ['websiteId', 'status'] },
-		{ on: ['websiteId', 'type'] },
-		{ on: ['websiteId', 'priority'] },
-		{ on: ['websiteId', 'createdAt'] },
-		{ on: ['categoryId'] },
-		{ on: ['email'] },
-		{ on: ['isPublic'] },
-	],
 });
 
 // Feedback Comments table - Comments/replies on feedback
@@ -91,11 +72,6 @@ const FeedbackComments = defineTable({
 		isFromAdmin: column.boolean({ default: false }),
 		createdAt: column.date({ default: NOW }),
 	},
-	indexes: [
-		{ on: ['feedbackId'] },
-		{ on: ['feedbackId', 'isInternal'] },
-		{ on: ['feedbackId', 'createdAt'] },
-	],
 });
 
 // Feedback Attachments table - File attachments (screenshots, etc.)
@@ -110,7 +86,6 @@ const FeedbackAttachments = defineTable({
 		url: column.text(), // Storage URL or path
 		createdAt: column.date({ default: NOW }),
 	},
-	indexes: [{ on: ['feedbackId'] }],
 });
 
 // Feedback Votes table - Track user votes on feedback
@@ -123,18 +98,13 @@ const FeedbackVotes = defineTable({
 		voteType: column.text({ enum: ['up', 'down'] }),
 		createdAt: column.date({ default: NOW }),
 	},
-	indexes: [
-		{ on: ['feedbackId', 'voterIp'], unique: true },
-		{ on: ['feedbackId', 'voterEmail'], unique: true },
-		{ on: ['feedbackId'] },
-	],
 });
 
 // Admin Users table - Admin users who can manage feedback
 const AdminUsers = defineTable({
 	columns: {
 		id: column.number({ primaryKey: true }),
-		email: column.text({ unique: true }),
+		email: column.text(),
 		password: column.text(),
 		name: column.text(),
 		role: column.text({ enum: ['admin', 'moderator', 'viewer'], default: 'viewer' }),
@@ -142,7 +112,6 @@ const AdminUsers = defineTable({
 		lastLogin: column.date({ optional: true }),
 		createdAt: column.date({ default: NOW }),
 	},
-	indexes: [{ on: ['email'], unique: true }, { on: ['role'] }, { on: ['isActive'] }],
 });
 
 // Website Admin Access table - Many-to-many relationship for admin access to websites
@@ -154,11 +123,6 @@ const WebsiteAdminAccess = defineTable({
 		permissions: column.json(), // Array of permissions like ['read', 'write', 'delete']
 		createdAt: column.date({ default: NOW }),
 	},
-	indexes: [
-		{ on: ['websiteId', 'adminUserId'], unique: true },
-		{ on: ['websiteId'] },
-		{ on: ['adminUserId'] },
-	],
 });
 
 // Analytics Events table - Track various events for analytics
@@ -172,11 +136,6 @@ const AnalyticsEvents = defineTable({
 		ipAddress: column.text({ optional: true }),
 		createdAt: column.date({ default: NOW }),
 	},
-	indexes: [
-		{ on: ['websiteId', 'eventType'] },
-		{ on: ['websiteId', 'createdAt'] },
-		{ on: ['eventType'] },
-	],
 });
 
 export default defineDb({
